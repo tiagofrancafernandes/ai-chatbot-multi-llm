@@ -1,0 +1,9 @@
+*
+!.gitkeep
+!**/.gitkeep
+!**/**/.gitkeep
+!.gitignore
+!plans
+!tasks
+!plans/.gitkeep
+!tasks/.gitkeep
