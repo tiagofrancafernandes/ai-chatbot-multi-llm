@@ -82,6 +82,8 @@ export class KnowledgeService {
 
         const prompt = `Consolide as seguintes informações em um resumo compacto para uso rápido pelo chatbot:\n\n${combinedContent}`;
 
+        let baseSummary = '';
+
         try {
             const generatedSummary = await this.llmService.generateText(
                 prompt,
@@ -95,7 +97,7 @@ export class KnowledgeService {
                 generatedSummary.trim().length > 20 &&
                 !generatedSummary.startsWith('Service notice:')
             ) {
-                return generatedSummary.trim();
+                baseSummary = generatedSummary.trim();
             }
         } catch (error) {
             this.logger.warn(
@@ -103,7 +105,47 @@ export class KnowledgeService {
             );
         }
 
-        return this.deterministicFallbackSummary(companyRules, additionalInstructions);
+        if (!baseSummary) {
+            baseSummary = this.deterministicFallbackSummary(companyRules, additionalInstructions);
+        }
+
+        const exceptionLines = (additionalInstructions || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => {
+                if (!line) {
+                    return false;
+                }
+                const lower = line.toLowerCase();
+                return (
+                    lower.includes('não teremos') ||
+                    lower.includes('nao teremos') ||
+                    lower.includes('não haverá') ||
+                    lower.includes('nao havera') ||
+                    lower.includes('não há atendimento') ||
+                    lower.includes('nao ha atendimento') ||
+                    lower.includes('não abre') ||
+                    lower.includes('nao abre') ||
+                    lower.includes('fechado') ||
+                    lower.includes('feriado') ||
+                    lower.includes('emancipação') ||
+                    lower.includes('emancipacao') ||
+                    lower.includes('aniversário') ||
+                    lower.includes('aniversario') ||
+                    lower.includes('recesso')
+                );
+            });
+
+        if (exceptionLines.length > 0) {
+            const exceptionsBlock = [
+                '\n\n### Avisos e Exceções Confirmadas de Atendimento (Prioridade Absoluta):',
+                ...exceptionLines.map((line) => `• ${line.replace(/^[-*•#\s]+/, '')}`),
+            ].join('\n');
+
+            return `${baseSummary}${exceptionsBlock}`;
+        }
+
+        return baseSummary;
     }
 
     private deterministicFallbackSummary(companyRules: string, additionalInstructions: string): string {

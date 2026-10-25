@@ -365,6 +365,46 @@ GET {{baseUrl}}/chat/history?customerId=5511999999999&scope=operator
 # @name clientGetHistory
 GET {{baseUrl}}/chat/history?customerId=5511999999999&scope=client
 
+### 41. Send Message - Relative Date Sunday Attendance Query
+# @name sendSundayAttendanceInquiry
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "atende aos domingos?"
+}
+
+### 42. Send Message - Relative Date Today Attendance Query
+# @name sendTodayAttendanceInquiry
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "tem atendimento presencial hoje?"
+}
+
+### 43. Send Message - Tomorrow Holiday Exception Inquiry
+# @name sendTomorrowHolidayInquiry
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "amanhã tem atendimento presencial?"
+}
+
+### 44. Send Message - Specific Date Holiday Exception Inquiry (2026-10-28)
+# @name sendSpecificDateHolidayInquiry
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "terá atendimento no dia 2026-10-28?"
+}
+
 
 
 

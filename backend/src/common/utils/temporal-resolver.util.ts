@@ -114,7 +114,8 @@ export class TemporalResolver {
     public static getCurrentTemporalContext(
         businessHours?: BusinessHours,
         timezone = TemporalResolver.DEFAULT_TIMEZONE,
-        referenceDate = new Date()
+        referenceDate = new Date(),
+        knowledgeBaseText?: string
     ): TemporalContextInfo {
         const parts = this.getNowParts(timezone, referenceDate);
         const dayName = this.DAY_NAMES_PT[parts.dayOfWeek] || 'domingo';
@@ -148,9 +149,24 @@ export class TemporalResolver {
         const yesterday = this.computeDateWithOffset(-1, timezone, referenceDate);
         const tomorrow = this.computeDateWithOffset(1, timezone, referenceDate);
 
+        // Check for specific date exceptions registered in knowledge base
+        const todayException = this.findExceptionForDate({ isoDate, formattedDate, dayName }, knowledgeBaseText);
+        const tomorrowException = this.findExceptionForDate(tomorrow, knowledgeBaseText);
+
+        let exceptionPrompt = '';
+        if (todayException?.isClosed) {
+            isOpenNow = false;
+            scheduleToday = todayException.schedule || 'Fechado (Exceção / Feriado Municipal)';
+            exceptionPrompt += `\n• ATENÇÃO EXCEÇÃO HOJE (${formattedDate}): Loja física fechada (${todayException.reason}).`;
+        }
+
+        if (tomorrowException?.isClosed) {
+            exceptionPrompt += `\n• ATENÇÃO EXCEÇÃO AMANHÃ (${tomorrow.formattedDate}): Loja física estará fechada (${tomorrowException.reason}).`;
+        }
+
         const statusDescription =
-            parts.dayOfWeek === 0
-                ? `Hoje é domingo (${formattedDate}). A loja física para atendimento presencial está FECHADA hoje.`
+            parts.dayOfWeek === 0 || todayException?.isClosed
+                ? `Hoje é ${dayName} (${formattedDate}). A loja física para atendimento presencial está FECHADA hoje.`
                 : isOpenNow
                   ? `Hoje é ${dayName} (${formattedDate}). A loja física está ABERTA agora (horário de hoje: ${scheduleToday}).`
                   : `Hoje é ${dayName} (${formattedDate}). A loja física está FECHADA no momento (horário de expediente: ${scheduleToday}).`;
@@ -166,7 +182,7 @@ export class TemporalResolver {
             `  - Sábado: 08:00 às 12:00\n` +
             `  - Domingo e Feriados: FECHADO (sem atendimento presencial na loja física).\n` +
             `• Status presencial hoje (${dayName}): ${scheduleToday} (No momento: ${isOpenNow ? 'ABERTO' : 'FECHADO'}).\n` +
-            `• Autoatendimento virtual (Chat IA): Disponível 24h por dia.`;
+            `• Autoatendimento virtual (Chat IA): Disponível 24h por dia.${exceptionPrompt}`;
 
         return {
             now: referenceDate,
@@ -181,6 +197,78 @@ export class TemporalResolver {
         };
     }
 
+    public static findExceptionForDate(
+        target: { isoDate: string; formattedDate: string; dayName: string },
+        knowledgeBaseText?: string
+    ): { isClosed: boolean; schedule?: string; reason?: string } | null {
+        if (!knowledgeBaseText) {
+            return null;
+        }
+
+        const lines = knowledgeBaseText.split('\n');
+        const targetIso = target.isoDate;
+        const targetFormatted = target.formattedDate;
+        const targetShort = target.formattedDate.substring(0, 5);
+        const targetDayNum = target.formattedDate.substring(0, 2);
+        const dayOfMonthRegex = new RegExp(`\\bdia\\s+0?${parseInt(targetDayNum, 10)}\\b`, 'i');
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) {
+                continue;
+            }
+
+            const lower = line.toLowerCase();
+            const hasDate =
+                lower.includes(targetIso) ||
+                lower.includes(targetFormatted) ||
+                lower.includes(targetShort) ||
+                dayOfMonthRegex.test(lower);
+
+            if (!hasDate) {
+                continue;
+            }
+
+            const isClosure =
+                lower.includes('não teremos') ||
+                lower.includes('nao teremos') ||
+                lower.includes('não haverá') ||
+                lower.includes('nao havera') ||
+                lower.includes('não há atendimento') ||
+                lower.includes('nao ha atendimento') ||
+                lower.includes('não abre') ||
+                lower.includes('nao abre') ||
+                lower.includes('fechado') ||
+                lower.includes('feriado') ||
+                lower.includes('emancipação') ||
+                lower.includes('emancipacao') ||
+                lower.includes('aniversário') ||
+                lower.includes('aniversario') ||
+                lower.includes('recesso');
+
+            if (isClosure) {
+                let reason = line
+                    .replace(/^[-*•#\s]+/, '')
+                    .replace(/^notas de conclusão:\s*/i, '')
+                    .replace(/^conclusão:\s*/i, '')
+                    .replace(/^avisos e exceções:\s*/i, '');
+
+                const motivoMatch = line.match(/(?:devido\s+(?:ao|à|a)|por\s+motivo\s+de|em\s+razão\s+de)\s+([^.]+)/i);
+                if (motivoMatch) {
+                    reason = motivoMatch[0].trim();
+                }
+
+                return {
+                    isClosed: true,
+                    schedule: 'Fechado (Feriado / Exceção Temporária)',
+                    reason,
+                };
+            }
+        }
+
+        return null;
+    }
+
     public static resolveTemporalQuery(
         text: string,
         businessHours?: BusinessHours,
@@ -189,7 +277,12 @@ export class TemporalResolver {
         referenceDate = new Date()
     ): TemporalResolutionResult {
         const lower = (text || '').toLowerCase().trim();
-        const currentContext = this.getCurrentTemporalContext(businessHours, timezone, referenceDate);
+        const currentContext = this.getCurrentTemporalContext(
+            businessHours,
+            timezone,
+            referenceDate,
+            knowledgeBaseText
+        );
         const currentDayOfWeek = currentContext.dayOfWeek;
 
         // 1. Check for specific relative day expressions
@@ -197,12 +290,52 @@ export class TemporalResolver {
         let matchedTerm: string | null = null;
         let isRoutinePlural = false;
 
-        if (lower.includes('antes de ontem') || lower.includes('anteontem') || lower.includes('ante-ontem')) {
+        // 1.0 Check for explicit ISO date: YYYY-MM-DD (e.g. 2026-10-26, 2026-10-28)
+        const isoMatch = lower.match(/\b(202\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/);
+        if (offsetDays === null && isoMatch) {
+            const y = parseInt(isoMatch[1], 10);
+            const m = parseInt(isoMatch[2], 10);
+            const d = parseInt(isoMatch[3], 10);
+            const todayParts = this.getNowParts(timezone, referenceDate);
+            const todayUtc = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day, 12, 0, 0));
+            const targetUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+            offsetDays = Math.round((targetUtc.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000));
+            matchedTerm = isoMatch[0];
+        }
+
+        // 1.1 Check for explicit Brazilian date: DD/MM/YYYY or DD/MM
+        const brMatch = lower.match(/\b(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])(?:\/(202\d))?\b/);
+        if (offsetDays === null && brMatch) {
+            const d = parseInt(brMatch[1], 10);
+            const m = parseInt(brMatch[2], 10);
+            const todayParts = this.getNowParts(timezone, referenceDate);
+            const y = brMatch[3] ? parseInt(brMatch[3], 10) : todayParts.year;
+            const todayUtc = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day, 12, 0, 0));
+            const targetUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+            offsetDays = Math.round((targetUtc.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000));
+            matchedTerm = brMatch[0];
+        }
+
+        // 1.2 Check for explicit "dia DD" (e.g. "dia 28", "dia 26")
+        const dayOfMonthMatch = lower.match(/\bdia\s+([0-9]{1,2})\b/);
+        if (offsetDays === null && dayOfMonthMatch) {
+            const targetDayNum = parseInt(dayOfMonthMatch[1], 10);
+            const todayParts = this.getNowParts(timezone, referenceDate);
+            const todayUtc = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day, 12, 0, 0));
+            const targetUtc = new Date(Date.UTC(todayParts.year, todayParts.month - 1, targetDayNum, 12, 0, 0));
+            offsetDays = Math.round((targetUtc.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000));
+            matchedTerm = `dia ${targetDayNum}`;
+        }
+
+        if (
+            offsetDays === null &&
+            (lower.includes('antes de ontem') || lower.includes('anteontem') || lower.includes('ante-ontem'))
+        ) {
             offsetDays = -2;
             matchedTerm = 'anteontem';
         }
 
-        if ((offsetDays === null && lower.includes('depois de amanhã')) || lower.includes('depois de amanha')) {
+        if (offsetDays === null && (lower.includes('depois de amanhã') || lower.includes('depois de amanha'))) {
             offsetDays = 2;
             matchedTerm = 'depois de amanhã';
         }
@@ -292,12 +425,17 @@ export class TemporalResolver {
             lower.includes('atendem presencial') ||
             lower.includes('atende presencial') ||
             lower.includes('tem atendimento') ||
+            lower.includes('terá atendimento') ||
+            lower.includes('tera atendimento') ||
+            lower.includes('vai ter atendimento') ||
             lower.includes('atende') ||
             lower.includes('atendem') ||
             lower.includes('abre') ||
             lower.includes('abrem') ||
+            lower.includes('vai abrir') ||
             lower.includes('funciona') ||
             lower.includes('funcionam') ||
+            lower.includes('vai funcionar') ||
             lower.includes('aberto') ||
             lower.includes('fechado') ||
             lower.includes('horário') ||
@@ -335,13 +473,20 @@ export class TemporalResolver {
             scheduleOnTargetDay = 'Fechado (Domingos e Feriados)';
         }
 
+        // Check for specific date exceptions registered in knowledge base / additional instructions
+        const exception = this.findExceptionForDate(target, knowledgeBaseText);
+        if (exception?.isClosed) {
+            isOpenOnTargetDay = false;
+            scheduleOnTargetDay = exception.schedule || 'Fechado (Feriado / Exceção Temporária)';
+        }
+
         // Build human-friendly, accurate explanation
         let responseMessage = '';
 
         const isSpecificallySundayQuery =
             lower.includes('domingo') || lower.includes('domingos') || isRoutinePlural || matchedTerm === 'domingo';
 
-        // Case A: Query specifically about Sundays (e.g. "atende aos domingos?", "abre domingo?")
+        // Case A: Query specifically about Sundays
         if (isSpecificallySundayQuery) {
             responseMessage =
                 `**Não**, aos **domingos e feriados** nossa loja física e escritório comercial **não realizam atendimento presencial** (ficamos fechados).\n\n` +
@@ -355,7 +500,14 @@ export class TemporalResolver {
 
         // Case B: Query about "hoje"
         if (!responseMessage && offsetDays === 0) {
-            if (currentDayOfWeek === 0) {
+            if (exception?.isClosed) {
+                responseMessage =
+                    `Hoje (**${target.dayName}, ${target.formattedDate}**) nossa loja física para atendimento presencial está **fechada** (${exception.reason}).\n\n` +
+                    `📍 **Endereço da Loja:** R. Tiradentes, 405 - Carmo do Cajuru, MG (Telefone: (37) 3333-4444).\n\n` +
+                    `Nosso atendimento virtual inteligente funciona 24 horas todos os dias para você consultar planos e faturas! Como posso te ajudar hoje?`;
+            }
+
+            if (!responseMessage && currentDayOfWeek === 0) {
                 responseMessage =
                     `**Hoje é domingo (${target.formattedDate})**, e nossa loja física para atendimento presencial está **fechada** aos domingos.\n\n` +
                     `📍 **Horário de Atendimento Presencial na Loja:**\n` +
@@ -363,7 +515,7 @@ export class TemporalResolver {
                     `• **Sábado:** 08:00 às 12:00\n` +
                     `• **Domingos e Feriados:** Fechado\n\n` +
                     `📍 **Endereço:** R. Tiradentes, 405 - Carmo do Cajuru, MG.\n\n` +
-                    `Reabriremos nosso atendimento presencial amanhã (segunda-feira) às 08:00. Pelo nosso chat virtual estou à disposição agora! O que você precisa?`;
+                    `Reabriremos nosso atendimento presencial amanhã às 08:00. Pelo nosso chat virtual estou à disposição agora! O que você precisa?`;
             }
 
             if (!responseMessage && currentContext.isOpenNow) {
@@ -385,7 +537,15 @@ export class TemporalResolver {
 
         // Case C: Query about "amanhã"
         if (!responseMessage && offsetDays === 1) {
-            if (isOpenOnTargetDay) {
+            if (exception?.isClosed) {
+                responseMessage =
+                    `Amanhã (**${target.dayName}, ${target.formattedDate}**) nossa loja física para atendimento presencial estará **fechada** (${exception.reason}).\n\n` +
+                    `📍 **Horário de Atendimento Normal:** Segunda a Sexta das 08h às 18h e Sábados das 08h às 12h.\n` +
+                    `📍 **Endereço:** R. Tiradentes, 405 - Carmo do Cajuru, MG (Telefone: (37) 3333-4444).\n\n` +
+                    `Nosso atendimento virtual inteligente por aqui funciona 24 horas todos os dias! Como posso te ajudar hoje?`;
+            }
+
+            if (!responseMessage && isOpenOnTargetDay) {
                 responseMessage =
                     `**Sim!** Amanhã (**${target.dayName}, ${target.formattedDate}**) teremos atendimento presencial normalmente das **${scheduleOnTargetDay}**.\n\n` +
                     `📍 **Endereço da Loja:** R. Tiradentes, 405 - Carmo do Cajuru, MG\n` +
@@ -401,9 +561,17 @@ export class TemporalResolver {
             }
         }
 
-        // Case D: General future or specific relative days (e.g. "depois de amanhã", "sexta que vem")
+        // Case D: General future or specific relative days (e.g. "depois de amanhã", "quarta-feira", "dia 28", etc.)
         if (!responseMessage) {
-            if (isOpenOnTargetDay) {
+            if (exception?.isClosed) {
+                responseMessage =
+                    `No dia **${target.formattedDate} (${target.dayName})**, nossa loja física estará **fechada** para atendimento presencial (${exception.reason}).\n\n` +
+                    `📍 **Horário de Atendimento Normal:** Segunda a Sexta das 08h às 18h e Sábados das 08h às 12h.\n` +
+                    `📍 **Endereço:** R. Tiradentes, 405 - Carmo do Cajuru, MG (Telefone: (37) 3333-4444).\n\n` +
+                    `Nosso atendimento virtual inteligente funciona 24 horas por aqui para te atender! Como posso te ajudar?`;
+            }
+
+            if (!responseMessage && isOpenOnTargetDay) {
                 responseMessage =
                     `**Sim!** Em **${target.dayName} (${target.formattedDate})**, nosso atendimento presencial funcionará normalmente das **${scheduleOnTargetDay}**.\n\n` +
                     `📍 **Endereço:** R. Tiradentes, 405 - Carmo do Cajuru, MG (Telefone: (37) 3333-4444).\n\n` +

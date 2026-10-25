@@ -455,6 +455,17 @@ Authorization: Bearer {{AUTH_TOKEN}}
 GET {{BASE_URL}}/api/chat/history?customerId={{CUSTOMER_REF}}&scope=client
 Accept: application/json
 
+### 43. Temporal Awareness - Specific Date Holiday Exception Inquiry (2026-10-28)
+# @name temporalAttendanceHolidayException
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "terá atendimento no dia 2026-10-28?"
+}
+
 
 
 

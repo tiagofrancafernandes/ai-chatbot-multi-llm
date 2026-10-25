@@ -57,14 +57,25 @@ export class FlowEngineService {
         const lastBotMessage =
             previousBotMessages.length > 0 ? previousBotMessages[previousBotMessages.length - 1].text : undefined;
 
-        const temporalInfo = TemporalResolver.getCurrentTemporalContext(this.databaseService.getBusinessHours());
+        const combinedKb = [
+            knowledgeBase.additionalInstructions || '',
+            knowledgeBase.cachedSummary || '',
+            knowledgeBase.companyRules || '',
+        ].join('\n\n');
+
+        const temporalInfo = TemporalResolver.getCurrentTemporalContext(
+            this.databaseService.getBusinessHours(),
+            TemporalResolver.DEFAULT_TIMEZONE,
+            new Date(),
+            combinedKb
+        );
 
         const intentContext: IntentContext = {
             previousBotMessage: lastBotMessage,
             hasPendingAction: Boolean(session.pendingAction),
             pendingActionType: session.pendingAction?.type,
             customerPlan: customer.plan,
-            knowledgeContext: knowledgeBase.cachedSummary,
+            knowledgeContext: combinedKb,
             temporalContext: temporalInfo.summaryPrompt,
         };
 
@@ -236,7 +247,24 @@ export class FlowEngineService {
             lower.includes('atendem na') ||
             lower.includes('atende na');
 
+        const hasCalendarOrDateFormat =
+            /\b202\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/.test(lower) ||
+            /\b(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\b/.test(lower) ||
+            /\bdia\s+[0-9]{1,2}\b/.test(lower);
+
+        const hasAttendanceQuestion =
+            lower.includes('tem atendimento') ||
+            lower.includes('terá atendimento') ||
+            lower.includes('tera atendimento') ||
+            lower.includes('vai ter atendimento') ||
+            lower.includes('vai abrir') ||
+            lower.includes('vai funcionar') ||
+            lower.includes('tem adimento') ||
+            lower.includes('adimento presencial');
+
         return (
+            hasCalendarOrDateFormat ||
+            hasAttendanceQuestion ||
             lower.includes('onde fica') ||
             lower.includes('qual o endereço') ||
             lower.includes('qual o endereco') ||
@@ -278,6 +306,12 @@ export class FlowEngineService {
             lower.includes('domingos') ||
             lower.includes('quarta-feira') ||
             lower.includes('quarta feira') ||
+            lower.includes('quarta') ||
+            lower.includes('quinta') ||
+            lower.includes('sexta') ||
+            lower.includes('terça') ||
+            lower.includes('terca') ||
+            lower.includes('segunda') ||
             lower.includes('sábado') ||
             lower.includes('sabado') ||
             lower.includes('cajuru') ||
@@ -295,6 +329,11 @@ export class FlowEngineService {
             lower.includes('email da empresa') ||
             lower.includes('e-mail da empresa') ||
             lower.includes('feriado') ||
+            lower.includes('emancipação') ||
+            lower.includes('emancipacao') ||
+            lower.includes('aniversário') ||
+            lower.includes('aniversario') ||
+            lower.includes('recesso') ||
             (lower.includes('presencial') && !lower.includes('assinar'))
         );
     }
@@ -563,15 +602,16 @@ export class FlowEngineService {
     ): Promise<StepRoutingOutcome> {
         const knowledgeBase = this.databaseService.getKnowledgeBase();
         const businessHours = this.databaseService.getBusinessHours();
-        const summary = knowledgeBase.cachedSummary || knowledgeBase.companyRules;
+        const combinedKb = [
+            knowledgeBase.additionalInstructions || '',
+            knowledgeBase.cachedSummary || '',
+            knowledgeBase.companyRules || '',
+        ].join('\n\n');
+        const summary = knowledgeBase.cachedSummary || combinedKb;
         const lower = text.toLowerCase().trim();
 
         // 1. Precise Temporal & Business Hours Query Resolution (Relative dates: hoje, ontem, amanhã, domingos, etc.)
-        const temporalResolution = TemporalResolver.resolveTemporalQuery(
-            text,
-            businessHours,
-            knowledgeBase.additionalInstructions
-        );
+        const temporalResolution = TemporalResolver.resolveTemporalQuery(text, businessHours, combinedKb);
 
         if (temporalResolution.hasTemporalReference && temporalResolution.responseMessage) {
             const options = customer.isIdentified
@@ -671,10 +711,15 @@ export class FlowEngineService {
 
         if (!responseText) {
             try {
-                const temporalInfo = TemporalResolver.getCurrentTemporalContext(businessHours);
+                const temporalInfo = TemporalResolver.getCurrentTemporalContext(
+                    businessHours,
+                    TemporalResolver.DEFAULT_TIMEZONE,
+                    new Date(),
+                    combinedKb
+                );
                 const prompt = `Com base nas informações oficiais da empresa e na data atual abaixo, responda à dúvida do cliente de forma prestativa, clara e objetiva em português:\n\n${temporalInfo.summaryPrompt}\n\nInformações do provedor:\n${summary}\n\nPergunta do cliente: "${text}"\n\nResponda em 2 ou 3 frases:`;
                 const systemInstruction =
-                    'Você é o assistente virtual do provedor de internet 100% Fibra Óptica em Carmo do Cajuru e São José dos Salgados - MG. Responda diretamente e cordialmente em português brasileiro usando apenas os fatos fornecidos. ATENÇÃO: A loja física para atendimento presencial fecha aos domingos e feriados. O provedor possui planos de fibra óptica para áreas urbanas e rurais.';
+                    'Você é o assistente virtual do provedor de internet 100% Fibra Óptica em Carmo do Cajuru e São José dos Salgados - MG. Responda diretamente e cordialmente em português brasileiro usando apenas os fatos fornecidos. ATENÇÃO: A loja física para atendimento presencial fecha aos domingos e feriados, e não abre em datas com exceções registradas. O provedor possui planos de fibra óptica para áreas urbanas e rurais.';
 
                 const generated = await this.llmService.generateText(
                     prompt,
