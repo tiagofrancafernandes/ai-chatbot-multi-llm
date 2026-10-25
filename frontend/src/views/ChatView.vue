@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { toast } from 'vue3-toastify';
 import { ApiService } from '../services/api';
 import { Customer, ChatMessage, ChatSession, ProviderInfo, AttendanceDepartment, HumanAgent } from '../types/chat';
+import { renderMarkdown } from '../utils/markdown';
+import { formatRelativeTime, formatIsoWithTimezone } from '../utils/date-format';
 
 const STORAGE_KEY = 'chat_customer_id';
 
@@ -27,6 +29,7 @@ const isTransferModalOpen = ref<boolean>(false);
 const agentInputText = ref<string>('');
 const selectedTimeout = ref<number>(60);
 const countdownSeconds = ref<number>(60);
+const currentTick = ref<number>(Date.now());
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 
 const messagesContainer = ref<HTMLDivElement | null>(null);
@@ -34,7 +37,7 @@ const messagesContainer = ref<HTMLDivElement | null>(null);
 const attendance = computed(() => session.value?.attendance);
 
 const quickSuggestions = [
-    { label: 'Say Hi', text: 'Olá, bom dia!' },
+    { label: 'Olá', text: 'Olá!' },
     { label: 'Ver Planos', text: 'Quero ver os planos de internet' },
     { label: 'Qual meu plano?', text: 'Qual é o meu plano atual?' },
     { label: 'Consultar Cobertura', text: 'Vocês atendem em Carmo do Cajuru e São José dos Salgados?' },
@@ -43,28 +46,6 @@ const quickSuggestions = [
     { label: 'Falar com Atendente', text: 'Quero falar com um atendente humano' },
     { label: 'Retomar com IA', text: 'Retomar atendimento com IA' },
 ];
-
-function formatMessage(text: string): string {
-    if (!text) {
-        return '';
-    }
-
-    let formatted = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    formatted = formatted.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline font-semibold inline-flex items-center gap-1">$1 ↗</a>'
-    );
-
-    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
-
-    formatted = formatted.replace(
-        /`([^`]+)`/g,
-        '<code class="bg-slate-950 text-cyan-300 px-1.5 py-0.5 rounded text-xs font-mono border border-slate-700/60">$1</code>'
-    );
-
-    return formatted;
-}
 
 onMounted(async () => {
     await focusMessageInput();
@@ -87,6 +68,8 @@ function startCountdownTimer(): void {
     }
 
     timerInterval = setInterval(() => {
+        currentTick.value = Date.now();
+
         if (!attendance.value || attendance.value.mode === 'ai') {
             countdownSeconds.value = selectedTimeout.value;
             return;
@@ -474,13 +457,28 @@ async function scrollToBottom(): Promise<void> {
                     <!-- System Notification Message (Centered pill) -->
                     <div
                         v-if="msg.sender === 'system'"
-                        class="mx-auto my-2 max-w-[90%] bg-slate-950/90 border border-slate-800 text-slate-300 px-4 py-2.5 rounded-2xl text-xs shadow-md whitespace-pre-wrap leading-relaxed"
-                        v-html="formatMessage(msg.text)"
-                    ></div>
+                        class="mx-auto my-2 max-w-[90%] bg-slate-950/90 border border-slate-800 text-slate-300 px-4 py-2.5 rounded-2xl text-xs shadow-md leading-relaxed flex flex-col items-center gap-1.5"
+                    >
+                        <div
+                            class="prose prose-invert max-w-none text-xs leading-relaxed text-center prose-p:my-0.5 prose-strong:text-cyan-300"
+                            v-html="renderMarkdown(msg.text)"
+                        ></div>
+                        <span
+                            v-if="msg.timestamp"
+                            class="text-[10px] text-slate-500 hover:text-slate-300 transition cursor-help flex items-center gap-1"
+                            :title="formatIsoWithTimezone(msg.timestamp)"
+                        >
+                            <iconify-icon icon="fa7-regular:clock" class="text-[9px]"></iconify-icon>
+                            {{ formatRelativeTime(msg.timestamp, currentTick) }}
+                        </span>
+                    </div>
 
                     <!-- User, Bot or Human Agent Messages -->
                     <div v-else class="flex flex-col" :class="msg.sender === 'user' ? 'items-end' : 'items-start'">
-                        <div class="flex items-center gap-2 mb-1 text-[11px] text-slate-400 px-1">
+                        <div
+                            class="flex items-center gap-2 mb-1 text-[11px] text-slate-400 px-1 max-w-[85%]"
+                            :class="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
+                        >
                             <iconify-icon
                                 :icon="
                                     msg.sender === 'user'
@@ -522,10 +520,20 @@ async function scrollToBottom(): Promise<void> {
                             >
                                 ⚡ {{ msg.secondaryRequest }}
                             </span>
+
+                            <!-- Relative time with ISO+tz tooltip on hover -->
+                            <span
+                                v-if="msg.timestamp"
+                                class="text-[10px] text-slate-400 hover:text-slate-200 transition cursor-help flex items-center gap-1 ml-1"
+                                :title="formatIsoWithTimezone(msg.timestamp)"
+                            >
+                                <iconify-icon icon="fa7-regular:clock" class="text-[9px] text-slate-500"></iconify-icon>
+                                {{ formatRelativeTime(msg.timestamp, currentTick) }}
+                            </span>
                         </div>
 
                         <div
-                            class="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm whitespace-pre-wrap"
+                            class="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm prose prose-invert max-w-none prose-p:my-1 prose-headings:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:bg-slate-950/90 prose-pre:border prose-pre:border-slate-700/60 prose-pre:p-3 prose-pre:rounded-xl prose-pre:text-xs prose-code:text-cyan-300 prose-code:font-mono prose-code:bg-slate-950/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300"
                             :class="{
                                 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-sm':
                                     msg.sender === 'user',
@@ -534,7 +542,7 @@ async function scrollToBottom(): Promise<void> {
                                 'bg-gradient-to-r from-blue-950 to-indigo-950 border border-blue-700/70 text-blue-100 rounded-tl-sm shadow-md':
                                     msg.sender === 'agent',
                             }"
-                            v-html="formatMessage(msg.text)"
+                            v-html="renderMarkdown(msg.text)"
                         ></div>
 
                         <!-- Interactive Option Buttons / Confirmation Chips -->

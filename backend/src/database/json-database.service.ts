@@ -94,14 +94,39 @@ export class JsonDatabaseService implements OnModuleInit {
             return undefined;
         }
 
+        const cleanDigits = normalized.replace(/\D/g, '');
         const currentDatabase = this.getDatabase();
 
         const customer = currentDatabase.customers.find((item) => {
-            const matchesId = item.id === normalized;
-            const matchesPhone = item.phone === normalized;
-            const matchesCpfCnpj = item.cpfCnpj === normalized;
+            const matchesExactId = item.id === normalized;
+            const matchesExactPhone = item.phone === normalized;
+            const matchesExactCpf = item.cpfCnpj === normalized;
 
-            return matchesId || matchesPhone || matchesCpfCnpj;
+            if (matchesExactId || matchesExactPhone || matchesExactCpf) {
+                return true;
+            }
+
+            if (cleanDigits.length >= 8) {
+                const itemPhoneDigits = (item.phone || '').replace(/\D/g, '');
+                const itemCpfDigits = (item.cpfCnpj || '').replace(/\D/g, '');
+                const itemIdDigits = (item.id || '').replace(/\D/g, '');
+
+                const matchesPhoneDigits =
+                    itemPhoneDigits.length >= 8 &&
+                    (itemPhoneDigits.endsWith(cleanDigits) || cleanDigits.endsWith(itemPhoneDigits));
+
+                const matchesCpfDigits = cleanDigits.length === 11 && itemCpfDigits === cleanDigits;
+
+                const matchesIdDigits =
+                    itemIdDigits.length >= 8 &&
+                    (itemIdDigits === cleanDigits ||
+                        itemIdDigits.endsWith(cleanDigits) ||
+                        cleanDigits.endsWith(itemIdDigits));
+
+                return matchesPhoneDigits || matchesCpfDigits || matchesIdDigits;
+            }
+
+            return false;
         });
 
         return customer;

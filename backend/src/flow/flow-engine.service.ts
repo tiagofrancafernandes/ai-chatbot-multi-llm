@@ -250,8 +250,52 @@ export class FlowEngineService {
         );
     }
 
-    private matchTargetPlan(text: string, plans: Plan[]): Plan {
-        const lower = text.toLowerCase();
+    private matchTargetPlan(text: string, plans: Plan[], fallbackToFirst = true): Plan | null {
+        const lower = (text || '').toLowerCase().trim();
+
+        // 1. Direct plan match by exact or partial name/id in current catalog
+        for (const plan of plans) {
+            const planNameLower = plan.name.toLowerCase();
+            const planIdLower = plan.id.toLowerCase();
+
+            if (lower.includes(planNameLower) || lower.includes(planIdLower)) {
+                return plan;
+            }
+        }
+
+        // 2. Canonical and legacy tier synonyms
+        const isProfessional = lower.includes('professional') || lower.includes('pro');
+        const isPremium = lower.includes('premium') || lower.includes('business');
+        const isStarter = lower.includes('starter');
+
+        if (isProfessional) {
+            const match =
+                plans.find((p) => p.name.includes('800')) ||
+                plans.find((p) => p.name.toLowerCase().includes('professional'));
+            if (match) {
+                return match;
+            }
+        }
+
+        if (isPremium) {
+            const match =
+                plans.find((p) => p.name.includes('1 Giga') || p.name.includes('1gb')) ||
+                plans.find((p) => p.name.toLowerCase().includes('premium'));
+            if (match) {
+                return match;
+            }
+        }
+
+        if (isStarter) {
+            const match =
+                plans.find((p) => p.name.includes('600')) ||
+                plans.find((p) => p.name.toLowerCase().includes('starter'));
+            if (match) {
+                return match;
+            }
+        }
+
+        // 3. Rural vs Urban matching by speed/price
         const isRural =
             lower.includes('rural') ||
             lower.includes('fazenda') ||
@@ -273,9 +317,15 @@ export class FlowEngineService {
                     return plan;
                 }
             }
-            const plan = plans.find((p) => p.name.includes('Rural 600')) || plans.find((p) => p.area === 'rural');
-            if (plan) {
-                return plan;
+            if (lower.includes('600') || lower.includes('99.99') || lower.includes('99,99')) {
+                const plan = plans.find((p) => p.name.includes('Rural 600'));
+                if (plan) {
+                    return plan;
+                }
+            }
+            const ruralDefault = plans.find((p) => p.area === 'rural');
+            if (ruralDefault) {
+                return ruralDefault;
             }
         }
 
@@ -304,7 +354,9 @@ export class FlowEngineService {
             lower.includes('79.99') ||
             lower.includes('79,99') ||
             lower.includes('79') ||
-            lower.includes('barato')
+            lower.includes('barato') ||
+            lower.includes('economico') ||
+            lower.includes('econômico')
         ) {
             const plan = plans.find((p) => p.name.includes('Urbano 600'));
             if (plan) {
@@ -312,7 +364,11 @@ export class FlowEngineService {
             }
         }
 
-        return plans[0];
+        if (fallbackToFirst) {
+            return plans[0] || null;
+        }
+
+        return null;
     }
 
     private async handleKnowledgeInquiry(
@@ -1062,18 +1118,51 @@ export class FlowEngineService {
         flow: FlowDefinition
     ): { isHandled: boolean; response: string; nodeId: string; updatedCustomer: Customer; options?: string[] } {
         const lowerText = text.toLowerCase();
-        const candidateIdentifier = analysis.extractedIdentifier || this.extractPhoneOrCpf(text);
+        const candidateIdentifier = this.getCandidateIdentifier(text, analysis);
+
+        // 1. Existing Customer Candidate Identifier Authentication (Absolute Priority)
+        if (candidateIdentifier) {
+            const matchedCustomer = this.databaseService.findCustomerByIdentifier(candidateIdentifier);
+
+            if (matchedCustomer) {
+                matchedCustomer.isIdentified = true;
+                this.databaseService.saveCustomer(matchedCustomer);
+
+                session.customerId = matchedCustomer.id;
+                session.pendingAction = null;
+
+                const response = `Identidade confirmada! Bem-vindo de volta, **${matchedCustomer.name || 'cliente'}**.\nPlano atual: **${matchedCustomer.plan || 'Sem plano'}**.\n\nComo posso te ajudar hoje?`;
+                const options = [
+                    'Qual é o meu plano atual?',
+                    'Quero mudar para o plano mais barato',
+                    'Ver minhas faturas',
+                    'Suporte técnico',
+                ];
+
+                return {
+                    isHandled: true,
+                    response,
+                    nodeId: 'node_customer_auth_action',
+                    updatedCustomer: matchedCustomer,
+                    options,
+                };
+            }
+        }
 
         const isRegistration =
-            analysis.primaryIntent === 'customer_registration' ||
-            lowerText.includes('registrar') ||
-            lowerText.includes('registro') ||
-            lowerText.includes('cadastrar') ||
-            lowerText.includes('cadastro') ||
-            lowerText.includes('criar conta') ||
-            lowerText.includes('abrir conta') ||
-            lowerText.includes('novo cliente') ||
-            lowerText.includes('novo cadastro');
+            !lowerText.includes('cadastrado') &&
+            !lowerText.includes('cadastrada') &&
+            !lowerText.includes('já tenho cadastro') &&
+            !lowerText.includes('ja tenho cadastro') &&
+            (analysis.primaryIntent === 'customer_registration' ||
+                lowerText.includes('registrar') ||
+                lowerText.includes('registro') ||
+                lowerText.includes('cadastrar') ||
+                lowerText.includes('fazer cadastro') ||
+                lowerText.includes('criar conta') ||
+                lowerText.includes('abrir conta') ||
+                lowerText.includes('novo cliente') ||
+                lowerText.includes('novo cadastro'));
 
         const isSubscription =
             analysis.primaryIntent === 'plan_subscription' ||
@@ -1091,17 +1180,17 @@ export class FlowEngineService {
         const registrationNode = this.findNode(flow, 'node_customer_registration_action');
         const regNodeId = registrationNode?.id || 'node_customer_registration_action';
 
-        // 1. Explicit Customer Registration Flow
+        // 2. Explicit Customer Registration Flow
         if (isRegistration && !lowerText.includes('mudar') && !lowerText.includes('trocar')) {
             const plans = this.databaseService.getPlans();
-            const chosenPlan = this.matchTargetPlan(text, plans);
+            const chosenPlan = this.matchTargetPlan(text, plans, false);
 
             const initialData = this.extractRegistrationFields(text, {});
             session.pendingAction = {
                 type: 'new_subscription',
-                targetPlan: chosenPlan.name,
+                targetPlan: chosenPlan ? chosenPlan.name : plans[0]?.name || 'Urbano 600 Mega',
                 registrationData: initialData,
-                description: `Cadastro de cliente e contratação do plano ${chosenPlan.name}`,
+                description: `Cadastro de cliente e contratação do plano ${chosenPlan ? chosenPlan.name : 'de internet'}`,
                 createdAt: Date.now(),
             };
 
@@ -1119,6 +1208,23 @@ export class FlowEngineService {
                         options: outcome.options,
                     };
                 }
+            }
+
+            if (chosenPlan) {
+                const response = `Excelente escolha! Para iniciarmos seu cadastro no plano **${chosenPlan.name}** (**R$ ${chosenPlan.price.toFixed(2)}/mês**), precisamos dos seguintes dados:\n• **Nome completo**\n• **CPF**\n• **E-mail**\n• **Telefone com DDD**\n• **Endereço completo de instalação (com bairro e cidade/distrito)**\n\n*(Você pode nos enviar todos os dados juntos em uma única mensagem ou aos poucos, como preferir!)*`;
+                const options = [
+                    'Carlos Silva, CPF 123.456.789-00, carlos@example.com, (37) 99888-7777, R. Tiradentes, 100 - Carmo do Cajuru',
+                    'Ver outros planos',
+                    'Cancelar cadastro',
+                ];
+
+                return {
+                    isHandled: true,
+                    response,
+                    nodeId: regNodeId,
+                    updatedCustomer: currentCustomer,
+                    options,
+                };
             }
 
             const response =
@@ -1143,20 +1249,12 @@ export class FlowEngineService {
             };
         }
 
-        // 2. Plan Subscription Flow
+        // 3. Plan Subscription Flow
         if (isSubscription && !lowerText.includes('mudar') && !lowerText.includes('trocar')) {
             const plans = this.databaseService.getPlans();
-            const hasSpecificPlan =
-                lowerText.includes('600') ||
-                lowerText.includes('800') ||
-                lowerText.includes('1gb') ||
-                lowerText.includes('1 giga') ||
-                lowerText.includes('1000') ||
-                lowerText.includes('urbano') ||
-                lowerText.includes('rural') ||
-                lowerText.includes('barato');
+            const matchedPlan = this.matchTargetPlan(text, plans, false);
 
-            if (!hasSpecificPlan) {
+            if (!matchedPlan) {
                 const response =
                     `Excelente! Ficamos felizes com seu interesse em assinar nossa internet 100% Fibra Óptica.\n\n` +
                     `${this.formatPlansMessage(plans)}\n\n` +
@@ -1186,7 +1284,7 @@ export class FlowEngineService {
                 };
             }
 
-            const chosenPlan = this.matchTargetPlan(text, plans);
+            const chosenPlan = matchedPlan;
 
             session.pendingAction = {
                 type: 'new_subscription',
@@ -1229,33 +1327,8 @@ export class FlowEngineService {
             };
         }
 
-        // 3. Existing Customer Candidate Identifier Authentication
+        // 4. Fallback for Candidate Identifier not found in database
         if (candidateIdentifier) {
-            const matchedCustomer = this.databaseService.findCustomerByIdentifier(candidateIdentifier);
-
-            if (matchedCustomer) {
-                matchedCustomer.isIdentified = true;
-                this.databaseService.saveCustomer(matchedCustomer);
-
-                session.customerId = matchedCustomer.id;
-
-                const response = `Identidade confirmada! Bem-vindo de volta, **${matchedCustomer.name || 'cliente'}**.\nPlano atual: **${matchedCustomer.plan || 'Sem plano'}**.\n\nComo posso te ajudar hoje?`;
-                const options = [
-                    'Qual é o meu plano atual?',
-                    'Quero mudar para o plano mais barato',
-                    'Ver minhas faturas',
-                    'Suporte técnico',
-                ];
-
-                return {
-                    isHandled: true,
-                    response,
-                    nodeId: 'node_customer_auth_action',
-                    updatedCustomer: matchedCustomer,
-                    options,
-                };
-            }
-
             const response = `Não localizamos nenhum cadastro com "${candidateIdentifier}".\n\nSe você ainda não é cliente, você pode iniciar um novo cadastro para assinar nossos planos!`;
             const options = ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
 
@@ -1337,7 +1410,29 @@ export class FlowEngineService {
             };
         }
 
-        // 7. Generic / Unknown Fallback for Guests
+        // 7. Plan Inquiry for Unidentified Guests
+        const isPlanQuery =
+            lowerText.includes('qual é o meu plano') ||
+            lowerText.includes('qual e o meu plano') ||
+            lowerText.includes('qual o meu plano') ||
+            lowerText.includes('meu plano atual') ||
+            lowerText.includes('meu plano') ||
+            lowerText.includes('minha assinatura');
+
+        if (isPlanQuery) {
+            const response = `Para consultar seu plano ativo e suas faturas, por favor informe seu número de telefone ou CPF cadastrado (ex: '5511999999999') para acessar sua conta.\n\nSe você ainda não é cliente, conheça nossos planos de internet 100% fibra óptica:`;
+            const options = ['Ver planos disponíveis', 'Quero me cadastrar', 'Falar com atendente'];
+
+            return {
+                isHandled: true,
+                response,
+                nodeId: 'node_customer_auth_action',
+                updatedCustomer: currentCustomer,
+                options,
+            };
+        }
+
+        // 8. Generic / Unknown Fallback for Guests
         const response = `Olá! Não consegui identificar sua solicitação.\n\nSe você já é cliente, por favor informe seu telefone ou CPF cadastrado (ex: '5511999999999') para acessar sua conta.\nSe deseja se cadastrar ou contratar um novo plano, basta selecionar abaixo:`;
         const options = ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
 
@@ -1399,8 +1494,62 @@ export class FlowEngineService {
             return { response, nodeId: 'node_plan_pricing_action', options };
         }
 
-        // 2. Customer Profile Data Query / Identifier Confirmation
-        const candidateIdentifier = analysis.extractedIdentifier || this.extractPhoneOrCpf(text);
+        // 2. Affirmative or Signature Claim without Pending Action
+        const isAffirmative = this.isAffirmativeConfirmation(text, analysis);
+        if (isAffirmative && !session.pendingAction) {
+            const response = `Não há nenhuma alteração ou solicitação pendente de confirmação no momento.\nSeu plano ativo é o **"${customer.plan || 'Padrão'}"**.\n\nComo posso te ajudar agora?`;
+            const options = [
+                'Qual é o meu plano atual?',
+                'Quero mudar para o plano mais barato',
+                'Ver minhas faturas',
+                'Suporte técnico',
+            ];
+
+            return { response, nodeId: 'node_action_confirmation', options };
+        }
+
+        const isSignClaim =
+            analysis.primaryIntent === 'simulate_signature' ||
+            analysis.primaryIntent === 'contract_signed' ||
+            lowerText.includes('simular assinatura') ||
+            lowerText.includes('já assinei') ||
+            lowerText.includes('ja assinei') ||
+            lowerText.includes('assinei o contrato');
+
+        if (isSignClaim && !session.pendingAction) {
+            const response = `Não localizamos nenhum contrato digital pendente de assinatura no momento. Seu plano **"${customer.plan || 'ativo'}"** já está regularizado e ativo na nossa rede!\n\nComo posso te ajudar hoje?`;
+            const options = [
+                'Qual é o meu plano atual?',
+                'Quero mudar para o plano mais barato',
+                'Ver minhas faturas',
+                'Suporte técnico',
+            ];
+
+            return { response, nodeId: 'node_subscription_success', options };
+        }
+
+        // 3. Plan Change Intent (Upgrade / Downgrade / Switch)
+        const isPlanChangeIntent =
+            analysis.primaryIntent === 'plan_change' ||
+            analysis.secondaryRequest === 'plan_upgrade' ||
+            lowerText.includes('mais barato') ||
+            lowerText.includes('mais em conta') ||
+            lowerText.includes('mudar plano') ||
+            lowerText.includes('trocar plano') ||
+            lowerText.includes('mudar para o plano') ||
+            lowerText.includes('mudar pro plano') ||
+            lowerText.includes('trocar para o plano') ||
+            lowerText.includes('trocar pro plano') ||
+            lowerText.includes('muda meu plano') ||
+            (lowerText.includes('mudar') &&
+                (lowerText.includes('barato') || lowerText.includes('starter') || lowerText.includes('pro')));
+
+        if (isPlanChangeIntent) {
+            return this.handlePlanChangeRequest(analysis, customer, session, plans, lowerText);
+        }
+
+        // 4. Customer Profile Data Query / Identifier Confirmation
+        const candidateIdentifier = this.getCandidateIdentifier(text, analysis);
         const isCustomerDataQuery =
             lowerText.includes('meus dados') ||
             lowerText.includes('meu cadastro') ||
@@ -1429,6 +1578,18 @@ export class FlowEngineService {
                     ];
 
                     return { response, nodeId: 'node_customer_auth_action', options, updatedCustomer: matchedOther };
+                }
+
+                if (!matchedOther) {
+                    const response = `Não localizamos nenhum cadastro ativo com o identificador "${candidateIdentifier}".\nSua sessão permanece autenticada como **${customer.name || 'Cliente'}**.\n\nDeseja consultar outro serviço ou falar com um atendente?`;
+                    const options = [
+                        'Qual é o meu plano atual?',
+                        'Alterar endereço cadastral',
+                        'Ver faturas e 2ª via',
+                        'Falar com atendente',
+                    ];
+
+                    return { response, nodeId: 'node_customer_auth_action', options };
                 }
             }
 
@@ -1518,26 +1679,6 @@ export class FlowEngineService {
             ];
 
             return { response, nodeId: 'node_cancellation_action', options };
-        }
-
-        // 3. Plan Change Intent (Upgrade / Downgrade / Switch)
-        const isPlanChangeIntent =
-            analysis.primaryIntent === 'plan_change' ||
-            analysis.secondaryRequest === 'plan_upgrade' ||
-            lowerText.includes('mais barato') ||
-            lowerText.includes('mais em conta') ||
-            lowerText.includes('mudar plano') ||
-            lowerText.includes('trocar plano') ||
-            lowerText.includes('mudar para o plano') ||
-            lowerText.includes('mudar pro plano') ||
-            lowerText.includes('trocar para o plano') ||
-            lowerText.includes('trocar pro plano') ||
-            lowerText.includes('muda meu plano') ||
-            (lowerText.includes('mudar') &&
-                (lowerText.includes('barato') || lowerText.includes('starter') || lowerText.includes('pro')));
-
-        if (isPlanChangeIntent) {
-            return this.handlePlanChangeRequest(analysis, customer, session, plans, lowerText);
         }
 
         // 4. Manual Transfer Request to Department Queue or Specific Agent
@@ -1785,45 +1926,54 @@ export class FlowEngineService {
         plans: Array<{ id: string; name: string; price: number; features: string[] }>,
         lowerText = ''
     ): StepRoutingOutcome {
-        // 1. Identify specific target plan first (e.g. Urbano 800 Mega, Rural 1 Giga)
-        let targetPlanName: string | null =
-            analysis.targetPlan && analysis.targetPlan !== 'cheapest' ? analysis.targetPlan : null;
+        // 1. Identify specific target plan first from user text or analysis
+        let targetPlanName: string | null = null;
 
-        const wantsCheapest =
-            analysis.targetPlan === 'cheapest' ||
-            lowerText.includes('barato') ||
-            lowerText.includes('em conta') ||
-            lowerText.includes('menor valor');
+        const matchedCandidate = this.matchTargetPlan(lowerText, plans as Plan[], false);
+        if (matchedCandidate) {
+            targetPlanName = matchedCandidate.name;
+        }
 
-        if (!targetPlanName && !wantsCheapest) {
-            const matchedCandidate = this.matchTargetPlan(lowerText, plans as Plan[]);
-            if (matchedCandidate && matchedCandidate.name !== customer.plan) {
-                targetPlanName = matchedCandidate.name;
+        if (!targetPlanName && analysis.targetPlan && analysis.targetPlan !== 'cheapest') {
+            const byAnalysis = plans.find((p) => p.name.toLowerCase() === analysis.targetPlan?.toLowerCase());
+            if (byAnalysis) {
+                targetPlanName = byAnalysis.name;
             }
         }
 
-        const matchedTarget = plans.find((p) => p.name.toLowerCase() === (targetPlanName || '').toLowerCase());
+        const wantsCheapest =
+            !targetPlanName &&
+            (analysis.targetPlan === 'cheapest' ||
+                lowerText.includes('barato') ||
+                lowerText.includes('em conta') ||
+                lowerText.includes('menor valor') ||
+                lowerText.includes('economico') ||
+                lowerText.includes('econômico'));
 
-        if (matchedTarget) {
-            if (customer.plan === matchedTarget.name) {
-                const response = `Você já está utilizando o plano **"${matchedTarget.name}"**.\n\nDeseja explorar outros planos ou verificar sua fatura?`;
-                const options = ['Ver outros planos', 'Ver minhas faturas', 'Menu principal'];
+        if (targetPlanName) {
+            const matchedTarget = plans.find((p) => p.name.toLowerCase() === targetPlanName.toLowerCase());
 
-                return { response, nodeId: 'node_plan_pricing_action', options };
+            if (matchedTarget) {
+                if (customer.plan === matchedTarget.name) {
+                    const response = `Você já está utilizando o plano **"${matchedTarget.name}"**.\n\nDeseja explorar outros planos ou verificar sua fatura?`;
+                    const options = ['Ver outros planos', 'Ver minhas faturas', 'Menu principal'];
+
+                    return { response, nodeId: 'node_plan_pricing_action', options };
+                }
+
+                session.pendingAction = {
+                    type: 'plan_change',
+                    targetPlan: matchedTarget.name,
+                    previousValue: customer.plan,
+                    description: `Mudança para o plano ${matchedTarget.name}`,
+                    createdAt: Date.now(),
+                };
+
+                const response = `Identifiquei a solicitação de migração para o plano:\n\n⭐ **${matchedTarget.name}** — R$ ${matchedTarget.price.toFixed(2)}/mês (${matchedTarget.features.join(', ')})\n\n⚠️ **Confirmação necessária:** Esta alteração atualizará suas condições contratuais.\n\nVocê confirma a alteração do seu plano para o **${matchedTarget.name}**?`;
+                const options = ['Sim, confirmo a mudança', 'Não, cancelar alteração', 'Ver outros planos'];
+
+                return { response, nodeId: 'node_plan_change_action', options };
             }
-
-            session.pendingAction = {
-                type: 'plan_change',
-                targetPlan: matchedTarget.name,
-                previousValue: customer.plan,
-                description: `Mudança para o plano ${matchedTarget.name}`,
-                createdAt: Date.now(),
-            };
-
-            const response = `Identifiquei a solicitação de migração para o plano:\n\n⭐ **${matchedTarget.name}** — R$ ${matchedTarget.price.toFixed(2)}/mês (${matchedTarget.features.join(', ')})\n\n⚠️ **Confirmação necessária:** Esta alteração atualizará suas condições contratuais.\n\nVocê confirma a alteração do seu plano para o **${matchedTarget.name}**?`;
-            const options = ['Sim, confirmo a mudança', 'Não, cancelar alteração', 'Ver outros planos'];
-
-            return { response, nodeId: 'node_plan_change_action', options };
         }
 
         // 2. User asked for the cheapest plan
@@ -1944,6 +2094,28 @@ export class FlowEngineService {
 
     private findNode(flow: FlowDefinition, nodeId: string): FlowNode | undefined {
         return flow.nodes.find((n) => n.id === nodeId);
+    }
+
+    private isValidIdentifier(val?: string | null): boolean {
+        if (!val) {
+            return false;
+        }
+
+        const digits = val.replace(/\D/g, '');
+        return digits.length >= 8 && digits.length <= 14;
+    }
+
+    private getCandidateIdentifier(text: string, analysis?: IntentAnalysisResult): string | null {
+        const fromText = this.extractPhoneOrCpf(text);
+        if (fromText) {
+            return fromText;
+        }
+
+        if (analysis?.extractedIdentifier && this.isValidIdentifier(analysis.extractedIdentifier)) {
+            return analysis.extractedIdentifier;
+        }
+
+        return null;
     }
 
     private extractPhoneOrCpf(text: string): string | null {

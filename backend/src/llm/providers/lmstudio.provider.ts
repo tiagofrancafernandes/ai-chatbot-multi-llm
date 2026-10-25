@@ -153,20 +153,27 @@ export class LmStudioProvider implements LlmProvider {
 
         const normalized = rawIntent.toLowerCase().trim();
 
-        if (normalized === 'greeting') {
-            return 'greeting';
-        }
+        const validIntents: PrimaryIntent[] = [
+            'greeting',
+            'customer_registration',
+            'plan_pricing',
+            'plan_subscription',
+            'contract_signed',
+            'simulate_signature',
+            'plan_change',
+            'cancellation',
+            'address_change',
+            'technical_support',
+            'financial',
+            'knowledge_inquiry',
+            'confirmation_yes',
+            'confirmation_no',
+            'human_handoff',
+            'unknown',
+        ];
 
-        if (normalized === 'plan_pricing') {
-            return 'plan_pricing';
-        }
-
-        if (normalized === 'technical_support') {
-            return 'technical_support';
-        }
-
-        if (normalized === 'financial') {
-            return 'financial';
+        if (validIntents.includes(normalized as PrimaryIntent)) {
+            return normalized as PrimaryIntent;
         }
 
         return 'unknown';

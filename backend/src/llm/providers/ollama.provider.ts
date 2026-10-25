@@ -316,7 +316,32 @@ export class OllamaProvider implements LlmProvider {
                 suggestedOptions?: string[];
             };
 
-            const primaryIntent = this.normalizePrimaryIntent(parsed.primaryIntent);
+            let primaryIntent = this.normalizePrimaryIntent(parsed.primaryIntent);
+            const lowerText = text.toLowerCase().trim();
+
+            // Deterministic safeguards for critical intent overrides
+            if (lowerText.includes('simular')) {
+                primaryIntent = 'simulate_signature';
+            }
+
+            if (
+                lowerText.includes('já assinei') ||
+                lowerText.includes('ja assinei') ||
+                lowerText.includes('acabei de assinar') ||
+                lowerText.includes('contrato assinado')
+            ) {
+                primaryIntent = 'contract_signed';
+            }
+
+            if (
+                lowerText.includes('qual é o meu plano') ||
+                lowerText.includes('qual e o meu plano') ||
+                lowerText.includes('qual o meu plano') ||
+                lowerText.includes('qual meu plano') ||
+                lowerText.includes('meu plano atual')
+            ) {
+                primaryIntent = 'plan_pricing';
+            }
 
             // If parsed intent is unknown, verify with rule heuristics
             if (primaryIntent === 'unknown') {
@@ -408,44 +433,27 @@ export class OllamaProvider implements LlmProvider {
 
         const normalized = rawIntent.toLowerCase().trim();
 
-        if (normalized === 'greeting') {
-            return 'greeting';
-        }
+        const validIntents: PrimaryIntent[] = [
+            'greeting',
+            'customer_registration',
+            'plan_pricing',
+            'plan_subscription',
+            'contract_signed',
+            'simulate_signature',
+            'plan_change',
+            'cancellation',
+            'address_change',
+            'technical_support',
+            'financial',
+            'knowledge_inquiry',
+            'confirmation_yes',
+            'confirmation_no',
+            'human_handoff',
+            'unknown',
+        ];
 
-        if (normalized === 'plan_pricing') {
-            return 'plan_pricing';
-        }
-
-        if (normalized === 'plan_change') {
-            return 'plan_change';
-        }
-
-        if (normalized === 'cancellation') {
-            return 'cancellation';
-        }
-
-        if (normalized === 'address_change') {
-            return 'address_change';
-        }
-
-        if (normalized === 'confirmation_yes') {
-            return 'confirmation_yes';
-        }
-
-        if (normalized === 'confirmation_no') {
-            return 'confirmation_no';
-        }
-
-        if (normalized === 'human_handoff') {
-            return 'human_handoff';
-        }
-
-        if (normalized === 'technical_support') {
-            return 'technical_support';
-        }
-
-        if (normalized === 'financial') {
-            return 'financial';
+        if (validIntents.includes(normalized as PrimaryIntent)) {
+            return normalized as PrimaryIntent;
         }
 
         return 'unknown';
