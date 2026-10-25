@@ -1,9 +1,14 @@
+import { CustomerRegistrationData } from './contract.interface';
+
 export interface PendingAction {
-    type: 'plan_change' | 'cancellation' | 'address_change';
+    type: 'plan_change' | 'cancellation' | 'address_change' | 'new_subscription' | 'contract_signing';
     targetPlan?: string;
     targetAddress?: string;
     previousValue?: string;
     description: string;
+    contractId?: string;
+    contractUrl?: string;
+    registrationData?: CustomerRegistrationData;
     createdAt: number;
 }
 

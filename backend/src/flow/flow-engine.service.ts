@@ -5,6 +5,7 @@ import { Customer } from '../common/interfaces/customer.interface';
 import { ChatSession, ChatMessage } from '../common/interfaces/chat.interface';
 import { IntentAnalysisResult, IntentContext } from '../llm/interfaces/llm-provider.interface';
 import { FlowDefinition, FlowNode } from '../common/interfaces/flow.interface';
+import { Contract, CustomerRegistrationData } from '../common/interfaces/contract.interface';
 
 export interface ProcessMessageParams {
     text: string;
@@ -66,7 +67,23 @@ export class FlowEngineService {
         session.currentIntent = analysis.primaryIntent;
         session.secondaryRequest = analysis.secondaryRequest;
 
-        // Step 2: Identification & Authentication Guard
+        // Step 2: Handle Pending Action (Subscription data entry, contract signing, confirmations)
+        if (session.pendingAction) {
+            const pendingOutcome = this.handlePendingAction(text, analysis, session, customer);
+
+            if (pendingOutcome) {
+                return this.finalizeStep(
+                    pendingOutcome.response,
+                    analysis,
+                    pendingOutcome.updatedCustomer || customer,
+                    session,
+                    pendingOutcome.nodeId,
+                    pendingOutcome.options
+                );
+            }
+        }
+
+        // Step 3: Identification & Authentication Guard for Guest Customers
         if (!customer.isIdentified) {
             const authResult = this.tryAuthenticateCustomer(text, analysis, customer, session, flow);
 
@@ -78,22 +95,6 @@ export class FlowEngineService {
                     session,
                     authResult.nodeId,
                     authResult.options
-                );
-            }
-        }
-
-        // Step 3: Handle Pending Action Confirmations (if active)
-        if (session.pendingAction) {
-            const confirmationOutcome = this.handlePendingConfirmation(text, analysis, session, customer);
-
-            if (confirmationOutcome) {
-                return this.finalizeStep(
-                    confirmationOutcome.response,
-                    analysis,
-                    confirmationOutcome.updatedCustomer || customer,
-                    session,
-                    confirmationOutcome.nodeId,
-                    confirmationOutcome.options
                 );
             }
         }
@@ -118,6 +119,431 @@ export class FlowEngineService {
         return this.finalizeStep(botResponse, analysis, customer, session, activeNodeId, options);
     }
 
+    private handlePendingAction(
+        text: string,
+        analysis: IntentAnalysisResult,
+        session: ChatSession,
+        customer: Customer
+    ): StepRoutingOutcome | null {
+        const pending = session.pendingAction;
+
+        if (!pending) {
+            return null;
+        }
+
+        if (pending.type === 'new_subscription') {
+            return this.handleNewSubscriptionData(text, analysis, session, customer);
+        }
+
+        if (pending.type === 'contract_signing') {
+            return this.handleContractSigning(text, analysis, session, customer);
+        }
+
+        return this.handlePendingConfirmation(text, analysis, session, customer);
+    }
+
+    private handleNewSubscriptionData(
+        text: string,
+        analysis: IntentAnalysisResult,
+        session: ChatSession,
+        customer: Customer
+    ): StepRoutingOutcome | null {
+        const pending = session.pendingAction;
+
+        if (!pending || pending.type !== 'new_subscription') {
+            return null;
+        }
+
+        const isCancel = this.isNegativeConfirmation(text, analysis);
+
+        if (isCancel) {
+            session.pendingAction = null;
+
+            return {
+                response:
+                    'Contratação cancelada conforme solicitado. Nenhum dado foi salvo e nenhuma cobrança será gerada.\n\nComo mais posso te ajudar?',
+                nodeId: 'node_subscription_cancelled',
+                options: ['Ver planos disponíveis', 'Falar com atendente'],
+                updatedCustomer: customer,
+            };
+        }
+
+        const currentData = pending.registrationData || {};
+        const updatedData = this.extractRegistrationFields(text, currentData);
+        pending.registrationData = updatedData;
+
+        const missing = this.getMissingRegistrationFields(updatedData);
+
+        if (missing.length > 0) {
+            const targetPlan = pending.targetPlan || 'Starter';
+            const collectedList: string[] = [];
+
+            if (updatedData.name) {
+                collectedList.push(`• Nome: **${updatedData.name}**`);
+            }
+            if (updatedData.cpf) {
+                collectedList.push(`• CPF: **${updatedData.cpf}**`);
+            }
+            if (updatedData.email) {
+                collectedList.push(`• E-mail: **${updatedData.email}**`);
+            }
+            if (updatedData.phone) {
+                collectedList.push(`• Telefone: **${updatedData.phone}**`);
+            }
+            if (updatedData.address) {
+                collectedList.push(`• Endereço: **${updatedData.address}**`);
+            }
+
+            const collectedText =
+                collectedList.length > 0 ? `Perfeito! Já registramos:\n${collectedList.join('\n')}\n\n` : '';
+
+            const missingListText = missing.map((f) => `• **${f}**`).join('\n');
+
+            const response = `${collectedText}Para emitirmos seu contrato digital do plano **${targetPlan}**, ainda precisamos dos seguintes dados:\n${missingListText}\n\n*(Você pode enviar os dados restantes juntos ou um por um!)*`;
+
+            const options = this.buildRegistrationOptions(missing);
+
+            return {
+                response,
+                nodeId: 'node_registration_data_collection',
+                options,
+                updatedCustomer: customer,
+            };
+        }
+
+        // All required fields present! Issue digital contract
+        const targetPlan = pending.targetPlan || 'Starter';
+        const plans = this.databaseService.getPlans();
+        const matchedPlan = plans.find((p) => p.name.toLowerCase() === targetPlan.toLowerCase()) || plans[0];
+
+        const contractId = `CONT-${Math.floor(100000 + Math.random() * 900000)}`;
+        const signatureUrl = `https://assinatura.empresa.com.br/contrato/${contractId}`;
+
+        const contract: Contract = {
+            id: contractId,
+            customerId: updatedData.phone || customer.id,
+            type: 'new_subscription',
+            planName: matchedPlan.name,
+            monthlyPrice: matchedPlan.price,
+            status: 'pending_signature',
+            signatureUrl,
+            customerData: updatedData,
+            createdAt: Date.now(),
+        };
+
+        this.databaseService.saveContract(contract);
+
+        session.pendingAction = {
+            type: 'contract_signing',
+            contractId: contract.id,
+            targetPlan: matchedPlan.name,
+            contractUrl: signatureUrl,
+            registrationData: updatedData,
+            description: `Assinatura de contrato digital para ${matchedPlan.name}`,
+            createdAt: Date.now(),
+        };
+
+        const response = `🎉 **Dados cadastrais validados com sucesso!**\n\nEmitimos o seu contrato digital para o plano **${matchedPlan.name}** (**R$ ${matchedPlan.price.toFixed(2)}/mês**):\n\n📄 **Contrato Nº:** \`${contract.id}\`\n👤 **Titular:** ${updatedData.name} (CPF: ${updatedData.cpf})\n📍 **Instalação:** ${updatedData.address}\n\n🔗 **Link Seguro para Assinatura:**\n[Clique aqui para Assinar o Contrato Digital](${contract.signatureUrl})\n\nApós assinar no link acima, me avise aqui digitando **'já assinei'** para ativarmos sua conexão!`;
+
+        const options = ['Já assinei o contrato', 'Simular assinatura do contrato', 'Cancelar contratação'];
+
+        return {
+            response,
+            nodeId: 'node_contract_issued',
+            options,
+            updatedCustomer: customer,
+        };
+    }
+
+    private handleContractSigning(
+        text: string,
+        analysis: IntentAnalysisResult,
+        session: ChatSession,
+        customer: Customer
+    ): StepRoutingOutcome | null {
+        const pending = session.pendingAction;
+
+        if (!pending || pending.type !== 'contract_signing' || !pending.contractId) {
+            return null;
+        }
+
+        const isCancel = this.isNegativeConfirmation(text, analysis);
+
+        if (isCancel) {
+            const contract = this.databaseService.findContractById(pending.contractId);
+
+            if (contract) {
+                contract.status = 'cancelled';
+                this.databaseService.saveContract(contract);
+            }
+
+            session.pendingAction = null;
+
+            return {
+                response: 'A formalização do contrato foi cancelada conforme solicitado.\n\nComo mais posso te ajudar?',
+                nodeId: 'node_contract_cancelled',
+                options: ['Ver planos disponíveis', 'Falar com atendente', 'Menu principal'],
+                updatedCustomer: customer,
+            };
+        }
+
+        const isSimulate =
+            analysis.primaryIntent === 'simulate_signature' ||
+            text.toLowerCase().includes('simular assinatura') ||
+            text.toLowerCase().includes('simular contrato');
+
+        if (isSimulate) {
+            this.databaseService.signContract(pending.contractId);
+        }
+
+        const isSignedClaim =
+            isSimulate ||
+            analysis.primaryIntent === 'contract_signed' ||
+            text.toLowerCase().includes('assinei') ||
+            text.toLowerCase().includes('assinado') ||
+            text.toLowerCase().includes('já assinei') ||
+            text.toLowerCase().includes('ja assinei');
+
+        if (!isSignedClaim) {
+            return {
+                response: `Estamos aguardando a assinatura digital do seu contrato:\n\n📄 **Contrato Nº:** \`${pending.contractId}\`\n🔗 **Link:** [Assinar Contrato Digital](${pending.contractUrl})\n\nAssim que assinar, digite **'já assinei'**! Ou clique em 'Simular assinatura do contrato' para testar.`,
+                nodeId: 'node_contract_verification',
+                options: ['Já assinei o contrato', 'Simular assinatura do contrato', 'Cancelar contratação'],
+                updatedCustomer: customer,
+            };
+        }
+
+        // Verify contract signature in database
+        const contract = this.databaseService.findContractById(pending.contractId);
+
+        if (!contract || contract.status !== 'signed') {
+            return {
+                response: `🔍 Verificamos no sistema de assinaturas e o contrato **${pending.contractId}** ainda consta como **Pendente de Assinatura**.\n\nPor favor, complete a assinatura através do link:\n🔗 [Assinar Contrato Digital](${pending.contractUrl})\n\n*(Dica de teste: você pode clicar no botão 'Simular assinatura do contrato' abaixo para testar a ativação imediata)*`,
+                nodeId: 'node_contract_verification',
+                options: ['Simular assinatura do contrato', 'Já assinei agora', 'Cancelar contratação'],
+                updatedCustomer: customer,
+            };
+        }
+
+        // Contract is SIGNED!
+        if (contract.type === 'new_subscription') {
+            const regData = pending.registrationData || contract.customerData || {};
+            const customerId = regData.phone || customer.id;
+
+            const newCustomer: Customer = {
+                id: customerId,
+                name: regData.name || 'Novo Cliente',
+                email: regData.email || '',
+                phone: regData.phone || customerId,
+                cpfCnpj: regData.cpf,
+                plan: contract.planName,
+                isIdentified: true,
+                invoices: [
+                    {
+                        id: `INV-${Date.now().toString().slice(-4)}`,
+                        amount: contract.monthlyPrice,
+                        dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+                        status: 'pending',
+                    },
+                ],
+                metadata: {
+                    cpf: regData.cpf,
+                    address: regData.address,
+                    contractId: contract.id,
+                    signedAt: contract.signedAt || Date.now(),
+                },
+            };
+
+            this.databaseService.saveCustomer(newCustomer);
+            session.customerId = newCustomer.id;
+            session.pendingAction = null;
+
+            const response = `✅ **Contrato assinado e confirmado com sucesso!**\n\nIdentificamos a validação digital do contrato **${contract.id}** via Certificado Digital ICP-Brasil.\n\n🎉 Parabéns, **${newCustomer.name}**! Seu plano **${contract.planName}** (R$ ${contract.monthlyPrice.toFixed(2)}/mês) está oficialmente contratado e ativo. Bem-vindo(a) à nossa rede!\n\nSeu acesso foi liberado. Como posso te ajudar agora?`;
+            const options = ['Qual é o meu plano atual?', 'Ver minhas faturas', 'Suporte técnico'];
+
+            return {
+                response,
+                nodeId: 'node_subscription_success',
+                options,
+                updatedCustomer: newCustomer,
+            };
+        }
+
+        if (contract.type === 'plan_change') {
+            const oldPlan = pending.previousValue || customer.plan || 'Anterior';
+            customer.plan = contract.planName;
+
+            if (!customer.metadata) {
+                customer.metadata = {};
+            }
+            customer.metadata.contractId = contract.id;
+            customer.metadata.planChangedAt = contract.signedAt || Date.now();
+
+            this.databaseService.saveCustomer(customer);
+            session.pendingAction = null;
+
+            const response = `✅ **Termo Aditivo assinado e confirmado com sucesso!**\n\nIdentificamos a validação digital do termo **${contract.id}**.\n\nSeu plano foi atualizado de "${oldPlan}" para o **"${contract.planName}"**.\nAs novas condições e valores já estão valendo para sua conta!`;
+            const options = ['Qual é o meu plano atual?', 'Ver minhas faturas', 'Menu principal'];
+
+            return {
+                response,
+                nodeId: 'node_plan_change_success',
+                options,
+                updatedCustomer: customer,
+            };
+        }
+
+        return null;
+    }
+
+    private extractRegistrationFields(text: string, existing: CustomerRegistrationData = {}): CustomerRegistrationData {
+        const result: CustomerRegistrationData = { ...existing };
+
+        // 1. Extract CPF
+        if (!result.cpf) {
+            const cpfRegex = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/;
+            const cpfMatch = text.match(cpfRegex);
+
+            if (cpfMatch) {
+                result.cpf = cpfMatch[0].trim();
+            }
+        }
+
+        // 2. Extract Email
+        if (!result.email) {
+            const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+            const emailMatch = text.match(emailRegex);
+
+            if (emailMatch) {
+                result.email = emailMatch[0].trim();
+            }
+        }
+
+        // 3. Extract Phone
+        if (!result.phone) {
+            const phoneRegex = /(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9?\d{4}[-\s]?\d{4}/;
+            const phoneMatch = text.match(phoneRegex);
+
+            if (phoneMatch && phoneMatch[0].replace(/\D/g, '').length >= 10) {
+                result.phone = phoneMatch[0].replace(/\D/g, '');
+            }
+        }
+
+        // 4. Extract Address
+        if (!result.address) {
+            const addressRegex =
+                /(?:rua|avenida|av\.?|alameda|travessa|rodovia|praça)\s+[^,\n]+(?:\s*,\s*\d+)?(?:\s*-\s*[^,\n]+)?/i;
+            const addressMatch = text.match(addressRegex);
+
+            if (addressMatch) {
+                result.address = addressMatch[0].trim();
+            }
+
+            if (!result.address) {
+                const genericAddr = text.match(/(?:endereço|endereco):?\s*([^,\n]+(?:,\s*\d+)?)/i);
+
+                if (genericAddr) {
+                    result.address = genericAddr[1].trim();
+                }
+            }
+        }
+
+        // 5. Extract Name
+        if (!result.name) {
+            const explicitNameMatch = text.match(/(?:nome|meu nome é|chamo-me|sou o|sou a):?\s*([A-Za-zÀ-ÿ\s]{3,40})/i);
+
+            if (explicitNameMatch) {
+                let cleanName = explicitNameMatch[1].trim();
+
+                cleanName = cleanName
+                    .replace(
+                        /\s+(?:e\s+)?(?:meu|minha|telefone|celular|whats|whatsapp|cpf|email|endereço|endereco|rua).*$/i,
+                        ''
+                    )
+                    .trim();
+
+                if (cleanName.length >= 2) {
+                    result.name = cleanName;
+                }
+            }
+
+            if (!result.name && text.includes(',')) {
+                const firstPart = text.split(',')[0].trim();
+
+                if (
+                    firstPart.split(/\s+/).length >= 2 &&
+                    !firstPart.includes('@') &&
+                    !/\d/.test(firstPart) &&
+                    !/^(rua|av|plano|quero|meu|minha)/i.test(firstPart)
+                ) {
+                    result.name = firstPart;
+                }
+            }
+
+            if (!result.name) {
+                const words = text.trim().split(/\s+/);
+
+                if (
+                    words.length >= 2 &&
+                    words.length <= 4 &&
+                    !text.includes('@') &&
+                    !/\d/.test(text) &&
+                    !/^(sim|não|nao|ola|oi|quero|bom dia|boa tarde|assinar|cancelar)/i.test(text)
+                ) {
+                    result.name = text.trim();
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private getMissingRegistrationFields(data: CustomerRegistrationData): string[] {
+        const missing: string[] = [];
+
+        if (!data.name) {
+            missing.push('Nome completo');
+        }
+
+        if (!data.cpf) {
+            missing.push('CPF');
+        }
+
+        if (!data.email) {
+            missing.push('E-mail');
+        }
+
+        if (!data.phone) {
+            missing.push('Telefone / WhatsApp');
+        }
+
+        if (!data.address) {
+            missing.push('Endereço completo de instalação');
+        }
+
+        return missing;
+    }
+
+    private buildRegistrationOptions(missing: string[]): string[] {
+        const options: string[] = [];
+
+        if (missing.includes('Nome completo') && missing.includes('CPF')) {
+            options.push('Meu nome é Carlos Silva, CPF 123.456.789-00');
+        }
+
+        if (missing.includes('E-mail') && missing.includes('Telefone / WhatsApp')) {
+            options.push('carlos@example.com, tel 5511988887777');
+        }
+
+        if (missing.includes('Endereço completo de instalação')) {
+            options.push('Rua das Flores, 120 - São Paulo');
+        }
+
+        options.push('Cancelar contratação');
+
+        return options;
+    }
+
     private handlePendingConfirmation(
         text: string,
         analysis: IntentAnalysisResult,
@@ -138,21 +564,45 @@ export class FlowEngineService {
             if (pending.type === 'plan_change' && pending.targetPlan) {
                 const oldPlan = customer.plan || 'Nenhum';
                 const newPlan = pending.targetPlan;
+                const plans = this.databaseService.getPlans();
+                const matchedPlan = plans.find((p) => p.name.toLowerCase() === newPlan.toLowerCase()) || plans[0];
 
-                customer.plan = newPlan;
-                this.databaseService.saveCustomer(customer);
-                session.pendingAction = null;
+                const contractId = `CONT-MOD-${Math.floor(100000 + Math.random() * 900000)}`;
+                const signatureUrl = `https://assinatura.empresa.com.br/contrato/${contractId}`;
 
-                const response = `✅ **Plano alterado com sucesso!**\n\nSeu plano foi atualizado de "${oldPlan}" para o **"${newPlan}"**.\nAs novas condições e valores já estão valendo para sua conta.`;
+                const contract: Contract = {
+                    id: contractId,
+                    customerId: customer.id,
+                    type: 'plan_change',
+                    planName: newPlan,
+                    monthlyPrice: matchedPlan.price,
+                    status: 'pending_signature',
+                    signatureUrl,
+                    createdAt: Date.now(),
+                };
+
+                this.databaseService.saveContract(contract);
+
+                session.pendingAction = {
+                    type: 'contract_signing',
+                    contractId: contract.id,
+                    targetPlan: newPlan,
+                    previousValue: oldPlan,
+                    contractUrl: signatureUrl,
+                    description: `Termo Aditivo de alteração para o plano ${newPlan}`,
+                    createdAt: Date.now(),
+                };
+
+                const response = `📄 **Termo Aditivo de Alteração de Plano Gerado!**\n\nPara formalizarmos a alteração do seu plano de "${oldPlan}" para o **"${newPlan}"** (R$ ${matchedPlan.price.toFixed(2)}/mês), acesse o link seguro para assinatura digital:\n\n🔗 **Link Seguro:** [Clique aqui para Assinar o Termo Aditivo](${contract.signatureUrl})\n\nAssim que concluir a assinatura digital, me avise aqui digitando **'já assinei'** para ativarmos o novo plano!`;
                 const options = [
-                    'Quais são os recursos do meu novo plano?',
-                    'Ver minhas faturas',
-                    'Voltar ao menu inicial',
+                    'Já assinei o contrato',
+                    'Simular assinatura do contrato',
+                    'Não, manter meu plano atual',
                 ];
 
                 return {
                     response,
-                    nodeId: 'node_plan_change_action',
+                    nodeId: 'node_plan_contract_action',
                     options,
                     updatedCustomer: customer,
                 };
@@ -315,12 +765,78 @@ export class FlowEngineService {
             };
         }
 
+        const isSubscription =
+            analysis.primaryIntent === 'plan_subscription' ||
+            text.toLowerCase().includes('assinar') ||
+            text.toLowerCase().includes('contratar') ||
+            text.toLowerCase().includes('quero o plano') ||
+            text.toLowerCase().includes('vou querer o plano');
+
+        if (isSubscription && !text.toLowerCase().includes('mudar') && !text.toLowerCase().includes('trocar')) {
+            const plans = this.databaseService.getPlans();
+            let chosenPlan = plans[0]; // Starter
+
+            const lower = text.toLowerCase();
+
+            if (lower.includes('pro') || lower.includes('professional')) {
+                const found = plans.find((p) => p.name === 'Professional');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            if (lower.includes('premium') || lower.includes('business')) {
+                const found = plans.find((p) => p.name === 'Premium Business');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            if (lower.includes('starter') || lower.includes('barato') || lower.includes('49')) {
+                const found = plans.find((p) => p.name === 'Starter');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            session.pendingAction = {
+                type: 'new_subscription',
+                targetPlan: chosenPlan.name,
+                registrationData: {},
+                description: `Contratação do plano ${chosenPlan.name}`,
+                createdAt: Date.now(),
+            };
+
+            const response = `Excelente escolha! O plano **${chosenPlan.name}** (**R$ ${chosenPlan.price.toFixed(2)}/mês**) oferece ${chosenPlan.features.join(', ')}.\n\nPara gerarmos seu contrato digital e ativarmos sua conexão, precisamos dos seus dados cadastrais:\n• **Nome completo**\n• **CPF**\n• **E-mail**\n• **Telefone com DDD**\n• **Endereço completo de instalação**\n\n*(Você pode nos enviar todos os dados juntos em uma única mensagem ou aos poucos, como preferir!)*`;
+
+            const options = [
+                'Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120',
+                'Ver outros planos',
+                'Cancelar contratação',
+            ];
+
+            return {
+                isHandled: true,
+                response,
+                nodeId: 'node_plan_subscription_start',
+                updatedCustomer: currentCustomer,
+                options,
+            };
+        }
+
         if (analysis.primaryIntent === 'plan_pricing') {
             const pricingNode = this.findNode(flow, 'node_plan_pricing_action');
             const plans = this.databaseService.getPlans();
-            const planLines = plans.map((p) => `• ${p.name}: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`);
-            const response = `Aqui estão nossos planos de assinatura disponíveis:\n\n${planLines.join('\n')}\n\nSe você já é cliente, informe seu telefone ou CPF cadastrado (ex: '5511999999999') para acessar sua conta!`;
-            const options = ['Meu telefone é 5511999999999', 'Meu CPF é 123.456.789-00', 'Falar com atendente'];
+            const planLines = plans.map(
+                (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
+            );
+            const response = `Aqui estão nossos planos de assinatura disponíveis:\n\n${planLines.join('\n')}\n\nQual plano você gostaria de assinar? Ou, se já for cliente, informe seu telefone ou CPF para acessar sua conta!`;
+            const options = [
+                'Quero assinar o plano Starter',
+                'Quero assinar o plano Professional',
+                'Quero assinar o plano Premium Business',
+                'Já sou cliente (informar telefone)',
+            ];
 
             return {
                 isHandled: true,
@@ -332,8 +848,8 @@ export class FlowEngineService {
         }
 
         if (analysis.primaryIntent === 'greeting') {
-            const response = `Olá! Seja bem-vindo ao nosso atendimento inteligente.\n\nPara acessar seus dados e serviços com segurança, por favor informe seu número de telefone ou CPF cadastrado (ex: '5511999999999'). Ou consulte nossos planos disponíveis!`;
-            const options = ['Meu telefone é 5511999999999', 'Ver planos disponíveis', 'Suporte técnico'];
+            const response = `Olá! Seja bem-vindo ao nosso atendimento inteligente.\n\nPara acessar seus dados e serviços com segurança, por favor informe seu número de telefone ou CPF cadastrado (ex: '5511999999999'). Ou consulte nossos planos para assinar!`;
+            const options = ['Ver planos disponíveis', 'Quero assinar um plano', 'Meu telefone é 5511999999999'];
 
             return {
                 isHandled: true,
@@ -730,6 +1246,13 @@ export class FlowEngineService {
     }
 
     private extractAddressFromText(text: string): string | null {
+        const lower = text.toLowerCase();
+
+        // Guard: If text explicitly talks about plans, do not extract as address
+        if (lower.includes('plano') || lower.includes('assinatura') || lower.includes('fatura')) {
+            return null;
+        }
+
         const addressRegex =
             /(?:rua|avenida|av\.?|alameda|travessa|rodovia|praça)\s+[^,\n]+(?:\s*,\s*\d+)?(?:\s*-\s*[^,\n]+)?/i;
         const match = text.match(addressRegex);
@@ -738,10 +1261,15 @@ export class FlowEngineService {
             return match[0].trim();
         }
 
-        const genericTargetMatch = text.match(/(?:para|pra|novo endereço:?)\s+([a-záàâãéèêíïóôõöúçñ0-9\s,.-]+)/i);
+        // Only generic match if explicit address indicator exists
+        if (lower.includes('endereço') || lower.includes('endereco') || lower.includes('mudei de casa')) {
+            const genericTargetMatch = text.match(
+                /(?:para|pra|novo endereço:?|novo endereco:?)\s+([a-záàâãéèêíïóôõöúçñ0-9\s,.-]+)/i
+            );
 
-        if (genericTargetMatch && genericTargetMatch[1].trim().length > 3) {
-            return genericTargetMatch[1].trim();
+            if (genericTargetMatch && genericTargetMatch[1].trim().length > 3) {
+                return genericTargetMatch[1].trim();
+            }
         }
 
         return null;

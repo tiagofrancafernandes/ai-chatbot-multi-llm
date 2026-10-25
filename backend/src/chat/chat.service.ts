@@ -194,4 +194,39 @@ export class ChatService {
             activeModel: this.llmService.getActiveModel(),
         };
     }
+
+    public signContract(contractId: string) {
+        if (!contractId) {
+            throw new BadRequestException('contractId is required');
+        }
+
+        const contract = this.databaseService.signContract(contractId);
+
+        if (!contract) {
+            throw new NotFoundException(`Contract with ID ${contractId} not found`);
+        }
+
+        return {
+            success: true,
+            contract,
+            message: `Contract ${contractId} signed successfully`,
+        };
+    }
+
+    public getContract(contractId: string) {
+        if (!contractId) {
+            throw new BadRequestException('contractId is required');
+        }
+
+        const contract = this.databaseService.findContractById(contractId);
+
+        if (!contract) {
+            throw new NotFoundException(`Contract with ID ${contractId} not found`);
+        }
+
+        return {
+            success: true,
+            contract,
+        };
+    }
 }

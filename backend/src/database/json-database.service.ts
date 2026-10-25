@@ -8,6 +8,7 @@ import { Plan } from '../common/interfaces/plan.interface';
 import { BusinessHours } from '../common/interfaces/business-hours.interface';
 import { ChatSession } from '../common/interfaces/chat.interface';
 import { FlowDefinition } from '../common/interfaces/flow.interface';
+import { Contract } from '../common/interfaces/contract.interface';
 import { INITIAL_DATABASE_DATA } from './default-database';
 
 @Injectable()
@@ -228,6 +229,82 @@ export class JsonDatabaseService implements OnModuleInit {
         return wasRemoved;
     }
 
+    public getContracts(): Contract[] {
+        const currentDatabase = this.getDatabase();
+
+        if (!currentDatabase.contracts) {
+            currentDatabase.contracts = [];
+        }
+
+        return currentDatabase.contracts;
+    }
+
+    public findContractById(id: string): Contract | null {
+        if (!id) {
+            return null;
+        }
+
+        const contracts = this.getContracts();
+
+        const match = contracts.find((item) => {
+            return item.id === id;
+        });
+
+        if (!match) {
+            return null;
+        }
+
+        return match;
+    }
+
+    public saveContract(contract: Contract): Contract {
+        if (!contract) {
+            throw new Error('Contract object cannot be empty');
+        }
+
+        if (!contract.id) {
+            throw new Error('Contract ID is required');
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        if (!currentDatabase.contracts) {
+            currentDatabase.contracts = [];
+        }
+
+        const existingIndex = currentDatabase.contracts.findIndex((item) => {
+            return item.id === contract.id;
+        });
+
+        if (existingIndex >= 0) {
+            currentDatabase.contracts[existingIndex] = contract;
+            this.saveDatabase(currentDatabase);
+            return contract;
+        }
+
+        currentDatabase.contracts.push(contract);
+        this.saveDatabase(currentDatabase);
+
+        return contract;
+    }
+
+    public signContract(id: string): Contract | null {
+        if (!id) {
+            return null;
+        }
+
+        const contract = this.findContractById(id);
+
+        if (!contract) {
+            return null;
+        }
+
+        contract.status = 'signed';
+        contract.signedAt = Date.now();
+
+        return this.saveContract(contract);
+    }
+
     public getFlow(): FlowDefinition {
         const currentDatabase = this.getDatabase();
 
@@ -278,6 +355,10 @@ export class JsonDatabaseService implements OnModuleInit {
         try {
             const fileContent = fs.readFileSync(this.databaseFilePath, 'utf-8');
             this.cache = JSON.parse(fileContent);
+
+            if (this.cache && !this.cache.contracts) {
+                this.cache.contracts = [];
+            }
         } catch (error) {
             this.logger.error(`Error reading database file: ${(error as Error).message}. Resetting to initial data.`);
             this.cache = INITIAL_DATABASE_DATA;

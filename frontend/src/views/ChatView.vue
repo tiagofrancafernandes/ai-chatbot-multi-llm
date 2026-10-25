@@ -24,14 +24,42 @@ const messagesContainer = ref<HTMLDivElement | null>(null);
 
 const quickSuggestions = [
     { label: 'Say Hi', text: 'Olá, bom dia!' },
+    { label: 'Ver Planos', text: 'Quero ver os planos para assinar' },
+    { label: 'Assinar Starter', text: 'Quero assinar o plano Starter' },
+    {
+        label: 'Enviar Cadastro',
+        text: 'Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120',
+    },
+    { label: 'Já assinei contrato', text: 'Já assinei o contrato' },
+    { label: 'Simular assinatura', text: 'Simular assinatura do contrato' },
     { label: 'Auth Mock Phone', text: 'Meu telefone cadastrado é 5511999999999' },
     { label: 'Qual meu plano?', text: 'Qual é o meu plano atual?' },
     { label: 'Mudar p/ mais barato', text: 'Quero mudar para o plano mais barato' },
     { label: 'Sim, confirmo', text: 'Sim, confirmo a mudança' },
-    { label: 'Mudar endereço', text: 'Mudei de endereço para Rua das Acácias, 450' },
-    { label: 'Quero cancelar', text: 'Quero cancelar meu plano' },
     { label: 'Ver Faturas', text: 'Quero ver minhas faturas e extrato financeiro' },
 ];
+
+function formatMessage(text: string): string {
+    if (!text) {
+        return '';
+    }
+
+    let formatted = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    formatted = formatted.replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline font-semibold inline-flex items-center gap-1">$1 ↗</a>'
+    );
+
+    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
+
+    formatted = formatted.replace(
+        /`([^`]+)`/g,
+        '<code class="bg-slate-950 text-cyan-300 px-1.5 py-0.5 rounded text-xs font-mono border border-slate-700/60">$1</code>'
+    );
+
+    return formatted;
+}
 
 onMounted(async () => {
     await focusMessageInput();
@@ -275,9 +303,8 @@ async function scrollToBottom(): Promise<void> {
                                 ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-sm'
                                 : 'bg-slate-800 text-slate-100 border border-slate-700/60 rounded-tl-sm'
                         "
-                    >
-                        {{ msg.text }}
-                    </div>
+                        v-html="formatMessage(msg.text)"
+                    ></div>
 
                     <!-- Interactive Option Buttons / Confirmation Chips -->
                     <div
@@ -297,7 +324,10 @@ async function scrollToBottom(): Promise<void> {
                                         ? 'fa7-solid:check'
                                         : opt.toLowerCase().includes('não') || opt.toLowerCase().includes('cancel')
                                           ? 'fa7-solid:xmark'
-                                          : 'fa7-solid:arrow-right'
+                                          : opt.toLowerCase().includes('assinar') ||
+                                              opt.toLowerCase().includes('contrato')
+                                            ? 'fa7-solid:file-signature'
+                                            : 'fa7-solid:arrow-right'
                                 "
                                 class="text-[10px]"
                             ></iconify-icon>

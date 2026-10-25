@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { InitChatDto } from './dto/init-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -40,5 +40,16 @@ export class ChatController {
     @HttpCode(HttpStatus.OK)
     public switchProvider(@Body() dto: SwitchProviderDto) {
         return this.chatService.setProvider(dto.providerId, dto.model);
+    }
+
+    @Post('contract/sign/:contractId')
+    @HttpCode(HttpStatus.OK)
+    public signContract(@Param('contractId') contractId: string) {
+        return this.chatService.signContract(contractId);
+    }
+
+    @Get('contract/:contractId')
+    public getContract(@Param('contractId') contractId: string) {
+        return this.chatService.getContract(contractId);
     }
 }

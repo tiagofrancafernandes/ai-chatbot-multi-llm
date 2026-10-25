@@ -86,6 +86,7 @@ export const INITIAL_DATABASE_DATA: DatabaseSchema = {
         timezone: 'America/Sao_Paulo',
     },
     sessions: [],
+    contracts: [],
     flow: {
         id: 'default_flow_v1',
         name: 'Standard Customer Service & Intent Router Flow',

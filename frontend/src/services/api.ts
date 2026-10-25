@@ -115,4 +115,27 @@ export class ApiService {
 
         return response.json();
     }
+
+    public static async signContract(contractId: string): Promise<{ success: boolean; contract: unknown }> {
+        const response = await fetch(`${API_BASE}/chat/contract/sign/${encodeURIComponent(contractId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to sign contract (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async getContract(contractId: string): Promise<{ success: boolean; contract: unknown }> {
+        const response = await fetch(`${API_BASE}/chat/contract/${encodeURIComponent(contractId)}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to get contract (${response.status})`);
+        }
+
+        return response.json();
+    }
 }

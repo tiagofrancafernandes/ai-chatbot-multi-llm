@@ -1,6 +1,9 @@
 export type PrimaryIntent =
     | 'greeting'
     | 'plan_pricing'
+    | 'plan_subscription'
+    | 'contract_signed'
+    | 'simulate_signature'
     | 'plan_change'
     | 'cancellation'
     | 'address_change'

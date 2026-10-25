@@ -11,7 +11,7 @@ Analyze the user text (including Brazilian slang, typos, abbreviations, and info
 
 Schema:
 {
-    "primaryIntent": "greeting" | "plan_pricing" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
+    "primaryIntent": "greeting" | "plan_pricing" | "plan_subscription" | "contract_signed" | "simulate_signature" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
     "secondaryRequest": "none" | "invoice_request" | "plan_upgrade",
     "actionDetail": string | null,
     "targetPlan": "cheapest" | "Starter" | "Professional" | "Premium Business" | null,
@@ -24,6 +24,9 @@ Schema:
 Intent Definitions:
 - "greeting": "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "hello".
 - "plan_pricing": Inquiries about available plans, pricing, values, or asking "qual meu plano atual?".
+- "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano Starter", "contratar o plano pro", "assinar de 49.90").
+- "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado").
+- "simulate_signature": User wants to simulate digital signature ("simular assinatura", "simular contrato").
 - "plan_change": User wants to change, switch, upgrade, or downgrade plan (e.g., "mudar pro mais barato", "trocar pro Starter", "muda meu plano").
 - "cancellation": User wants to cancel subscription or contract (e.g., "quero cancelar", "cancela meu plano", "encerrar assinatura").
 - "address_change": User requests address update (e.g., "mudei de casa", "trocar meu endereço pra Rua X 123", "novo endereço").
@@ -100,6 +103,77 @@ export function evaluateFallbackIntent(
                 actionDetail: 'cancel_pending_action',
             };
         }
+    }
+
+    // Contract Simulation & Signature Checks
+    if (text.includes('simular assinatura') || text.includes('simular contrato')) {
+        return {
+            primaryIntent: 'simulate_signature',
+            secondaryRequest: 'none',
+            isClientExplicit: true,
+            confidence: 0.99,
+            providerUsed: providerName,
+            modelUsed: 'heuristic-rule-engine',
+            actionDetail: 'simulate_signature',
+        };
+    }
+
+    const isContractSigned =
+        text.includes('assinei') ||
+        text.includes('ja assinei') ||
+        text.includes('já assinei') ||
+        text.includes('contrato assinado') ||
+        text.includes('assinado com sucesso') ||
+        text.includes('acabei de assinar');
+
+    if (isContractSigned) {
+        return {
+            primaryIntent: 'contract_signed',
+            secondaryRequest: 'none',
+            isClientExplicit: true,
+            confidence: 0.99,
+            providerUsed: providerName,
+            modelUsed: 'heuristic-rule-engine',
+            actionDetail: 'contract_signed',
+        };
+    }
+
+    // Plan Subscription Intent (Visitor / Prospect)
+    const isPlanSubscription =
+        text.includes('assinar') ||
+        text.includes('contratar') ||
+        text.includes('quero assinar') ||
+        text.includes('quero contratar') ||
+        text.includes('escolho o plano') ||
+        text.includes('quero o plano') ||
+        text.includes('vou querer o plano') ||
+        text.includes('assinar plano');
+
+    if (isPlanSubscription && !text.includes('mudar') && !text.includes('trocar')) {
+        let subTarget = 'Starter';
+
+        if (text.includes('pro') || text.includes('professional')) {
+            subTarget = 'Professional';
+        }
+
+        if (text.includes('premium') || text.includes('business')) {
+            subTarget = 'Premium Business';
+        }
+
+        if (text.includes('starter') || text.includes('barato')) {
+            subTarget = 'Starter';
+        }
+
+        return {
+            primaryIntent: 'plan_subscription',
+            secondaryRequest: 'none',
+            isClientExplicit: true,
+            confidence: 0.95,
+            targetPlan: subTarget,
+            providerUsed: providerName,
+            modelUsed: 'heuristic-rule-engine',
+            actionDetail: 'plan_subscription',
+        };
     }
 
     // 2. Cancellation Intent

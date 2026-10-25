@@ -10,6 +10,7 @@ export interface Customer {
     name?: string;
     cpfCnpj?: string;
     phone?: string;
+    email?: string;
     plan?: string;
     notes?: string;
     invoices: Invoice[];
