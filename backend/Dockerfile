@@ -7,7 +7,7 @@ RUN npm install -g pnpm@11.10.0
 COPY pnpm-lock.yaml package.json pnpm-workspace.yaml .npmrc ./
 COPY backend/package.json ./backend/
 
-RUN pnpm install --frozen-lockfile --filter backend
+RUN pnpm install --ignore-scripts --frozen-lockfile --filter backend
 
 COPY backend ./backend
 
@@ -23,7 +23,7 @@ RUN npm install -g pnpm@11.10.0
 COPY pnpm-lock.yaml package.json pnpm-workspace.yaml .npmrc ./
 COPY backend/package.json ./backend/
 
-RUN pnpm install --prod --frozen-lockfile --filter backend
+RUN pnpm install --prod --ignore-scripts --frozen-lockfile --filter backend
 
 COPY --from=builder /app/backend/dist ./backend/dist
 

@@ -97,7 +97,10 @@ export class OllamaProvider implements LlmProvider {
 
     private hasSubtleActionKeywords(text: string): boolean {
         const lower = text.toLowerCase();
+        const hasIdPattern = Boolean(text.match(/\b(?:\d{10,13}|\d{3}\.\d{3}\.\d{3}-\d{2})\b/));
+
         return (
+            hasIdPattern ||
             lower.includes('mudar') ||
             lower.includes('trocar') ||
             lower.includes('mais barato') ||
@@ -115,17 +118,28 @@ export class OllamaProvider implements LlmProvider {
             lower.includes('contratar') ||
             lower.includes('assinei') ||
             lower.includes('simular') ||
-            lower.includes('quero o plano') ||
-            lower.includes('plano starter') ||
-            lower.includes('plano pro') ||
-            lower.includes('plano premium') ||
+            lower.includes('plano') ||
+            lower.includes('meu plano') ||
+            lower.includes('plano atual') ||
+            lower.includes('qual plano') ||
+            lower.includes('meus dados') ||
+            lower.includes('meu cadastro') ||
+            lower.includes('telefone') ||
+            lower.includes('cpf') ||
             lower.includes('horário') ||
             lower.includes('horario') ||
             lower.includes('presencial') ||
             lower.includes('onde fica') ||
             lower.includes('funciona hoje') ||
             lower.includes('quarta-feira') ||
-            lower.includes('quarta feira')
+            lower.includes('quarta feira') ||
+            lower.includes('cobertura') ||
+            lower.includes('cajuru') ||
+            lower.includes('salgados') ||
+            lower.includes('fibra') ||
+            lower.includes('mesh') ||
+            lower.includes('link dedicado') ||
+            lower.includes('wifi')
         );
     }
 

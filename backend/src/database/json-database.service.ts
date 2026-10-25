@@ -389,6 +389,17 @@ export class JsonDatabaseService implements OnModuleInit {
                 this.saveDatabase(this.cache);
             }
 
+            if (this.cache) {
+                const hasOldPlans = this.cache.plans.some((p) => p.name === 'Starter' || p.name === 'Professional');
+
+                if (hasOldPlans) {
+                    this.cache.plans = [...INITIAL_DATABASE_DATA.plans];
+                    this.cache.businessHours = { ...INITIAL_DATABASE_DATA.businessHours };
+                    this.cache.knowledgeBase = { ...INITIAL_DATABASE_DATA.knowledgeBase };
+                    this.saveDatabase(this.cache);
+                }
+            }
+
             if (this.cache?.flow?.nodes) {
                 const hasRegistrationNode = this.cache.flow.nodes.some(
                     (node) => node.id === 'node_customer_registration_action'

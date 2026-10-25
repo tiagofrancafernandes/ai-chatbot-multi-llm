@@ -6,4 +6,6 @@ export interface Plan {
     billingCycle: 'monthly' | 'yearly';
     features: string[];
     isPopular: boolean;
+    area?: 'urbano' | 'rural';
+    speed?: string;
 }

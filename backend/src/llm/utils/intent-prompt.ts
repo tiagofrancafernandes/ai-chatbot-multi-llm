@@ -14,7 +14,7 @@ Schema:
     "primaryIntent": "greeting" | "customer_registration" | "plan_pricing" | "plan_subscription" | "contract_signed" | "simulate_signature" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "knowledge_inquiry" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
     "secondaryRequest": "none" | "invoice_request" | "plan_upgrade",
     "actionDetail": string | null,
-    "targetPlan": "cheapest" | "Starter" | "Professional" | "Premium Business" | null,
+    "targetPlan": "cheapest" | "Urbano 600 Mega" | "Urbano 800 Mega" | "Urbano 1 Giga" | "Rural 600 Mega" | "Rural 800 Mega" | "Rural 1 Giga" | null,
     "extractedAddress": string | null (extract address ONLY if present in the user text itself, otherwise null),
     "isClientExplicit": boolean,
     "extractedIdentifier": string | null,
@@ -24,16 +24,16 @@ Schema:
 Intent Definitions:
 - "greeting": "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "hello".
 - "customer_registration": User (visitor/prospect) wants to register, sign up, create an account, or open customer profile (e.g. "quero me registrar", "criar conta", "fazer cadastro", "novo cliente", "cadastrar").
-- "plan_pricing": Inquiries about available plans, pricing, values, or asking "qual meu plano atual?".
-- "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano Starter", "contratar o plano pro", "assinar de 49.90").
+- "plan_pricing": Inquiries about available 100% optical fiber internet plans, pricing, values, coverage in Carmo do Cajuru and São José dos Salgados, or asking "qual meu plano atual?".
+- "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano de 600 mega", "contratar fibra urbana de 800", "assinar de 79.99", "plano rural").
 - "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado"). NEVER classify as confirmation_no!
 - "simulate_signature": User wants to simulate digital signature ("simular assinatura", "simular contrato"). NEVER classify "simular assinatura" as confirmation_no or cancellation!
-- "plan_change": User wants to change, switch, upgrade, or downgrade plan (e.g., "mudar para o plano Professional", "trocar pro Starter", "mudar pro mais barato"). If user mentions a specific plan, targetPlan MUST be that plan ("Professional", "Starter", "Premium Business"), NOT "cheapest".
+- "plan_change": User wants to change, switch, upgrade, or downgrade plan (e.g., "mudar para o plano de 800 Mega", "trocar pro plano de 1 Giga", "mudar pro mais barato"). If user mentions a specific plan, targetPlan MUST be that plan, NOT "cheapest".
 - "cancellation": User wants to cancel subscription or contract (e.g., "quero cancelar", "cancela meu plano", "encerrar assinatura").
 - "address_change": User requests address update (e.g., "mudei de casa", "trocar meu endereço pra Rua X 123", "novo endereço").
 - "technical_support": Connection outages, slow speed, blinking red router lights, system errors, "caiu a net", "modem piscando".
 - "financial": Invoices, boletos, 2nd copy, billing, debts, payment inquiries.
-- "knowledge_inquiry": Questions regarding company physical address, location, business days, operating hours, in-person attendance, company rules, holiday exceptions, or temporary notices (e.g. "qual o endereço da empresa?", "vocês têm atendimento presencial?", "qual o horário de funcionamento?", "abre na quarta-feira?", "onde fica?").
+- "knowledge_inquiry": Questions regarding company physical address in Carmo do Cajuru - MG (R. Tiradentes, 405), phone ((37) 3333-4444), email (comercial@minhainternet.com), operating hours (Seg-Sex 08h-18h, Sáb 08h-12h), 100% optical fiber connection, mesh network / extra routers, corporate Wi-Fi, dedicated links for companies, or coverage areas (Carmo do Cajuru - MG and São José dos Salgados - MG, 100% urban and rural proximities).
 - "confirmation_yes": Affirmation when a confirmation is pending ("sim", "confirmo", "pode ser", "positivo", "claro", "isso", "pode mudar").
 - "confirmation_no": Denial or aborting pending action ("não", "cancela isso", "esquece", "não quero mais", "deixa quieto").
 - "human_handoff": User specifically requests a human agent ("falar com atendente", "humano", "atendente").
@@ -188,24 +188,52 @@ export function evaluateFallbackIntent(
         text.includes('quero o plano') ||
         text.includes('vou querer o plano') ||
         text.includes('assinar plano') ||
-        text.includes('plano starter') ||
-        text.includes('plano pro') ||
-        text.includes('plano professional') ||
-        text.includes('plano premium');
+        text.includes('plano urbano') ||
+        text.includes('plano rural') ||
+        text.includes('600 mega') ||
+        text.includes('800 mega') ||
+        text.includes('1 giga') ||
+        text.includes('1gb');
 
     if (isPlanSubscription && !text.includes('mudar') && !text.includes('trocar')) {
         let subTarget: string | undefined = undefined;
+        const isRural = text.includes('rural');
 
-        if (text.includes('pro') || text.includes('professional')) {
-            subTarget = 'Professional';
+        if (isRural) {
+            if (text.includes('1gb') || text.includes('1 giga') || text.includes('1000') || text.includes('120')) {
+                subTarget = 'Rural 1 Giga';
+            }
+
+            if (!subTarget && (text.includes('800') || text.includes('110'))) {
+                subTarget = 'Rural 800 Mega';
+            }
+
+            if (!subTarget) {
+                subTarget = 'Rural 600 Mega';
+            }
         }
 
-        if (text.includes('premium') || text.includes('business')) {
-            subTarget = 'Premium Business';
-        }
+        if (!isRural) {
+            if (
+                text.includes('1gb') ||
+                text.includes('1 giga') ||
+                text.includes('1000') ||
+                text.includes('99.99') ||
+                text.includes('99,99')
+            ) {
+                subTarget = 'Urbano 1 Giga';
+            }
 
-        if (text.includes('starter') || text.includes('barato')) {
-            subTarget = 'Starter';
+            if (
+                !subTarget &&
+                (text.includes('800') || text.includes('89.99') || text.includes('89,99') || text.includes('89'))
+            ) {
+                subTarget = 'Urbano 800 Mega';
+            }
+
+            if (!subTarget) {
+                subTarget = 'Urbano 600 Mega';
+            }
         }
 
         return {
@@ -236,34 +264,70 @@ export function evaluateFallbackIntent(
     }
 
     // 3. Knowledge & Information Inquiry (Company address, business hours, in-person attendance, exceptions)
+    const isCustomerDataQuery =
+        text.includes('meu telefone') ||
+        text.includes('telefone cadastrado') ||
+        text.includes('meu cpf') ||
+        text.includes('cpf cadastrado') ||
+        text.includes('meus dados') ||
+        text.includes('meu plano');
+
     const isKnowledgeInquiry =
-        text.includes('onde fica') ||
-        text.includes('qual o endereço') ||
-        text.includes('qual o endereco') ||
-        text.includes('endereço da empresa') ||
-        text.includes('endereco da empresa') ||
-        text.includes('endereço de vocês') ||
-        text.includes('endereco de voces') ||
-        text.includes('atendimento presencial') ||
-        text.includes('atendem presencial') ||
-        text.includes('atendimento físico') ||
-        text.includes('posso ir aí') ||
-        text.includes('posso ir ai') ||
-        text.includes('horário de atendimento') ||
-        text.includes('horario de atendimento') ||
-        text.includes('horário de funcionamento') ||
-        text.includes('horario de funcionamento') ||
-        text.includes('qual o horário') ||
-        text.includes('qual o horario') ||
-        text.includes('que horas abre') ||
-        text.includes('que horas fecha') ||
-        text.includes('abre hoje') ||
-        text.includes('aberto hoje') ||
-        text.includes('funciona hoje') ||
-        text.includes('quarta-feira') ||
-        text.includes('quarta feira') ||
-        text.includes('feriado') ||
-        (text.includes('presencial') && !text.includes('assinar'));
+        !isCustomerDataQuery &&
+        (text.includes('onde fica') ||
+            text.includes('qual o endereço') ||
+            text.includes('qual o endereco') ||
+            text.includes('endereço da empresa') ||
+            text.includes('endereco da empresa') ||
+            text.includes('endereço de vocês') ||
+            text.includes('endereco de voces') ||
+            text.includes('atendimento presencial') ||
+            text.includes('atendem presencial') ||
+            text.includes('atendimento físico') ||
+            text.includes('posso ir aí') ||
+            text.includes('posso ir ai') ||
+            text.includes('horário de atendimento') ||
+            text.includes('horario de atendimento') ||
+            text.includes('horário de funcionamento') ||
+            text.includes('horario de funcionamento') ||
+            text.includes('qual o horário') ||
+            text.includes('qual o horario') ||
+            text.includes('que horas abre') ||
+            text.includes('que horas fecha') ||
+            text.includes('abre hoje') ||
+            text.includes('aberto hoje') ||
+            text.includes('funciona hoje') ||
+            text.includes('quarta-feira') ||
+            text.includes('quarta feira') ||
+            text.includes('sábado') ||
+            text.includes('sabado') ||
+            text.includes('cajuru') ||
+            text.includes('salgados') ||
+            text.includes('cobertura') ||
+            text.includes('área de cobertura') ||
+            text.includes('area de cobertura') ||
+            text.includes('área atendida') ||
+            text.includes('area atendida') ||
+            text.includes('atendem em') ||
+            text.includes('atende em') ||
+            text.includes('atendem na') ||
+            text.includes('atende na') ||
+            text.includes('zona rural') ||
+            text.includes('área rural') ||
+            text.includes('area rural') ||
+            text.includes('mesh') ||
+            text.includes('roteador') ||
+            text.includes('link dedicado') ||
+            text.includes('wifi corporativo') ||
+            text.includes('wi-fi corporativo') ||
+            text.includes('fibra optica') ||
+            text.includes('fibra óptica') ||
+            (text.includes('telefone') && !text.includes('meu')) ||
+            (text.includes('contato') && !text.includes('meu')) ||
+            text.includes('email da empresa') ||
+            text.includes('e-mail da empresa') ||
+            text.includes('feriado') ||
+            (text.includes('presencial') && !text.includes('assinar')));
 
     if (primaryIntent === 'unknown' && isKnowledgeInquiry) {
         primaryIntent = 'knowledge_inquiry';
@@ -339,16 +403,32 @@ export function evaluateFallbackIntent(
             targetPlan = 'cheapest';
         }
 
-        if (text.includes('starter')) {
-            targetPlan = 'Starter';
+        if (text.includes('rural')) {
+            if (text.includes('1gb') || text.includes('1 giga') || text.includes('1000')) {
+                targetPlan = 'Rural 1 Giga';
+            }
+
+            if (!targetPlan && text.includes('800')) {
+                targetPlan = 'Rural 800 Mega';
+            }
+
+            if (!targetPlan) {
+                targetPlan = 'Rural 600 Mega';
+            }
         }
 
-        if (text.includes('pro') || text.includes('professional')) {
-            targetPlan = 'Professional';
-        }
+        if (!targetPlan) {
+            if (text.includes('1gb') || text.includes('1 giga') || text.includes('1000')) {
+                targetPlan = 'Urbano 1 Giga';
+            }
 
-        if (text.includes('business') || text.includes('premium')) {
-            targetPlan = 'Premium Business';
+            if (text.includes('800')) {
+                targetPlan = 'Urbano 800 Mega';
+            }
+
+            if (text.includes('600')) {
+                targetPlan = 'Urbano 600 Mega';
+            }
         }
     }
 
@@ -412,7 +492,7 @@ export function evaluateFallbackIntent(
         secondaryRequest = 'none';
     }
 
-    // 9. Plan Pricing Inquiries
+    // 9. Plan Pricing & Current Plan Inquiries
     const isPricing =
         text.includes('plano') ||
         text.includes('preco') ||
@@ -421,7 +501,9 @@ export function evaluateFallbackIntent(
         text.includes('quanto custa') ||
         text.includes('tabela') ||
         text.includes('quais planos') ||
-        text.includes('qual meu plano');
+        text.includes('qual meu plano') ||
+        text.includes('qual é o meu plano') ||
+        text.includes('meu plano');
 
     if (primaryIntent === 'unknown' && isPricing) {
         primaryIntent = 'plan_pricing';

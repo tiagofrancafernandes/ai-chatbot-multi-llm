@@ -6,6 +6,7 @@ import { ChatSession, ChatMessage } from '../common/interfaces/chat.interface';
 import { IntentAnalysisResult, IntentContext } from '../llm/interfaces/llm-provider.interface';
 import { FlowDefinition, FlowNode } from '../common/interfaces/flow.interface';
 import { Contract, CustomerRegistrationData } from '../common/interfaces/contract.interface';
+import { Plan } from '../common/interfaces/plan.interface';
 
 export interface ProcessMessageParams {
     text: string;
@@ -161,6 +162,17 @@ export class FlowEngineService {
     private isKnowledgeQuery(text: string): boolean {
         const lower = (text || '').toLowerCase().trim();
 
+        if (
+            lower.includes('meu telefone') ||
+            lower.includes('telefone cadastrado') ||
+            lower.includes('meu cpf') ||
+            lower.includes('cpf cadastrado') ||
+            lower.includes('meus dados') ||
+            lower.includes('meu plano')
+        ) {
+            return false;
+        }
+
         return (
             lower.includes('onde fica') ||
             lower.includes('qual o endereço') ||
@@ -187,9 +199,120 @@ export class FlowEngineService {
             lower.includes('funciona hoje') ||
             lower.includes('quarta-feira') ||
             lower.includes('quarta feira') ||
+            lower.includes('sábado') ||
+            lower.includes('sabado') ||
+            lower.includes('cajuru') ||
+            lower.includes('salgados') ||
+            lower.includes('cobertura') ||
+            lower.includes('área de cobertura') ||
+            lower.includes('area de cobertura') ||
+            lower.includes('área atendida') ||
+            lower.includes('area atendida') ||
+            lower.includes('atendem em') ||
+            lower.includes('atende em') ||
+            lower.includes('atendem na') ||
+            lower.includes('atende na') ||
+            lower.includes('zona rural') ||
+            lower.includes('área rural') ||
+            lower.includes('area rural') ||
+            lower.includes('mesh') ||
+            lower.includes('roteador') ||
+            lower.includes('link dedicado') ||
+            lower.includes('wifi corporativo') ||
+            lower.includes('wi-fi corporativo') ||
+            lower.includes('fibra optica') ||
+            lower.includes('fibra óptica') ||
+            (lower.includes('telefone') && !lower.includes('meu')) ||
+            (lower.includes('contato') && !lower.includes('meu')) ||
+            lower.includes('email da empresa') ||
+            lower.includes('e-mail da empresa') ||
             lower.includes('feriado') ||
             (lower.includes('presencial') && !lower.includes('assinar'))
         );
+    }
+
+    private formatPlansMessage(plans: Plan[]): string {
+        const urbanPlans = plans.filter((p) => p.area === 'urbano');
+        const ruralPlans = plans.filter((p) => p.area === 'rural');
+
+        const urbanLines = urbanPlans.map(
+            (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
+        );
+        const ruralLines = ruralPlans.map(
+            (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
+        );
+
+        return (
+            `Aqui estão nossos planos de internet 100% Fibra Óptica:\n\n` +
+            `🏙️ **Área Urbana (Carmo do Cajuru e São José dos Salgados - Instalação Grátis):**\n${urbanLines.join('\n')}\n\n` +
+            `🌾 **Área Rural (Proximidades - Taxa de instalação sob consulta do ponto):**\n${ruralLines.join('\n')}\n\n` +
+            `💼 *Serviços adicionais: Rede Mesh, Wi-Fi Corporativo e Links Dedicados são à combinar sob análise de necessidade.*`
+        );
+    }
+
+    private matchTargetPlan(text: string, plans: Plan[]): Plan {
+        const lower = text.toLowerCase();
+        const isRural =
+            lower.includes('rural') ||
+            lower.includes('fazenda') ||
+            lower.includes('sitio') ||
+            lower.includes('sítio') ||
+            lower.includes('roça') ||
+            lower.includes('chácara');
+
+        if (isRural) {
+            if (lower.includes('1gb') || lower.includes('1 giga') || lower.includes('1000') || lower.includes('120')) {
+                const plan = plans.find((p) => p.name.includes('Rural 1 Giga'));
+                if (plan) {
+                    return plan;
+                }
+            }
+            if (lower.includes('800') || lower.includes('110')) {
+                const plan = plans.find((p) => p.name.includes('Rural 800'));
+                if (plan) {
+                    return plan;
+                }
+            }
+            const plan = plans.find((p) => p.name.includes('Rural 600')) || plans.find((p) => p.area === 'rural');
+            if (plan) {
+                return plan;
+            }
+        }
+
+        if (
+            lower.includes('1gb') ||
+            lower.includes('1 giga') ||
+            lower.includes('1000') ||
+            lower.includes('99.99') ||
+            lower.includes('99,99')
+        ) {
+            const plan = plans.find((p) => p.name.includes('Urbano 1 Giga'));
+            if (plan) {
+                return plan;
+            }
+        }
+
+        if (lower.includes('800') || lower.includes('89.99') || lower.includes('89,99') || lower.includes('89')) {
+            const plan = plans.find((p) => p.name.includes('Urbano 800'));
+            if (plan) {
+                return plan;
+            }
+        }
+
+        if (
+            lower.includes('600') ||
+            lower.includes('79.99') ||
+            lower.includes('79,99') ||
+            lower.includes('79') ||
+            lower.includes('barato')
+        ) {
+            const plan = plans.find((p) => p.name.includes('Urbano 600'));
+            if (plan) {
+                return plan;
+            }
+        }
+
+        return plans[0];
     }
 
     private async handleKnowledgeInquiry(
@@ -200,21 +323,111 @@ export class FlowEngineService {
     ): Promise<StepRoutingOutcome> {
         const knowledgeBase = this.databaseService.getKnowledgeBase();
         const summary = knowledgeBase.cachedSummary || knowledgeBase.companyRules;
+        const lower = text.toLowerCase().trim();
 
         let responseText = '';
 
-        try {
-            const prompt = `Com base nas informações da empresa abaixo, responda à dúvida do cliente de forma prestativa, clara e objetiva:\n\nResumo compilado:\n${summary}\n\nDetalhes de referência:\n${knowledgeBase.companyRules}\n${knowledgeBase.additionalInstructions ? `Avisos adicionais: ${knowledgeBase.additionalInstructions}` : ''}\n\nPergunta do cliente: "${text}"`;
-            const systemInstruction =
-                'Você é o assistente virtual da Telecom Connect. Responda diretamente e cordialmente à dúvida do usuário em português brasileiro usando apenas as informações fornecidas no resumo e regras (endereço, horários, atendimento presencial, exceções). Seja claro, conciso e educado.';
+        // Deterministic accurate responses for core provider facts
+        const isCoverageQuery =
+            lower.includes('cajuru') ||
+            lower.includes('salgados') ||
+            lower.includes('cobertura') ||
+            lower.includes('atendem em') ||
+            lower.includes('atende em') ||
+            lower.includes('área atendida') ||
+            lower.includes('area atendida') ||
+            lower.includes('onde atendem') ||
+            lower.includes('zona rural') ||
+            lower.includes('área rural') ||
+            lower.includes('area rural');
 
-            const generated = await this.llmService.generateText(prompt, systemInstruction, undefined, 'qwen2.5:0.5b');
+        const isHoursQuery =
+            lower.includes('horário') ||
+            lower.includes('horario') ||
+            lower.includes('sábado') ||
+            lower.includes('sabado') ||
+            lower.includes('que horas abre') ||
+            lower.includes('que horas fecha') ||
+            lower.includes('abre hoje') ||
+            lower.includes('funciona hoje') ||
+            lower.includes('atendimento no sábado');
 
-            if (generated && generated.trim().length > 15 && !generated.startsWith('Service notice:')) {
-                responseText = generated.trim();
+        const isAddressQuery =
+            lower.includes('onde fica') ||
+            lower.includes('qual o endereço') ||
+            lower.includes('qual o endereco') ||
+            lower.includes('endereço da empresa') ||
+            lower.includes('endereco da empresa') ||
+            lower.includes('endereço de vocês') ||
+            lower.includes('endereco de voces') ||
+            lower.includes('posso ir aí') ||
+            lower.includes('posso ir ai') ||
+            lower.includes('tiradentes');
+
+        const isMeshOrDedicatedQuery =
+            lower.includes('mesh') ||
+            lower.includes('link dedicado') ||
+            lower.includes('wifi corporativo') ||
+            lower.includes('wi-fi corporativo') ||
+            lower.includes('roteador adicional') ||
+            lower.includes('roteadores adicionais') ||
+            lower.includes('venda de roteador');
+
+        if (isCoverageQuery) {
+            responseText =
+                `Sim! Atendemos com **100% Fibra Óptica** de ponta a ponta:\n\n` +
+                `• **Carmo do Cajuru - MG:** 100% da área urbana atendida e parcialmente a zona rural nas proximidades da cidade.\n` +
+                `• **São José dos Salgados - MG (distrito):** 100% da área urbana atendida e parcialmente a zona rural nas proximidades.\n\n` +
+                `*(Para a zona rural, a taxa de instalação é calculada de acordo com a distância até a nossa rede cabeada).*\n\n` +
+                `Deseja consultar os planos disponíveis para sua localidade?`;
+        }
+
+        if (!responseText && isHoursQuery) {
+            responseText =
+                `Nosso horário de atendimento (presencial e telefônico) é:\n\n` +
+                `• **Segunda a Sexta-feira:** 08:00 às 18:00\n` +
+                `• **Sábado:** 08:00 às 12:00\n` +
+                `• **Domingos e Feriados:** Fechado (com plantão técnico para emergências de rede).\n\n` +
+                `Como posso te ajudar hoje?`;
+        }
+
+        if (!responseText && isAddressQuery) {
+            responseText =
+                `Nosso atendimento presencial fica localizado em:\n\n` +
+                `📍 **Endereço:** R. Tiradentes, 405 - Carmo do Cajuru, MG, CEP 35510-000\n` +
+                `📞 **Telefone:** (37) 3333-4444\n` +
+                `📧 **E-mail Comercial:** comercial@minhainternet.com\n\n` +
+                `Venha nos fazer uma visita ou entre em contato pelos nossos canais oficiais!`;
+        }
+
+        if (!responseText && isMeshOrDedicatedQuery) {
+            responseText =
+                `Sim! Além dos planos de internet fibra óptica residencial, oferecemos:\n\n` +
+                `• **Rede Mesh & Venda de Roteadores:** Cobertura Wi-Fi em todos os cômodos de residências e comércios;\n` +
+                `• **Wi-Fi Corporativo Gerenciado:** Para empresas, lojas e escritórios com alto fluxo de dispositivos;\n` +
+                `• **Links Dedicados Empresariais:** IP fixo, 100% de banda garantida e SLA prioritário.\n\n` +
+                `*Obs: Os valores e condições para esses serviços são sob medida, a combinar conforme análise técnica da sua necessidade.*`;
+        }
+
+        if (!responseText) {
+            try {
+                const prompt = `Com base nas informações oficiais da empresa abaixo, responda à dúvida do cliente de forma prestativa, clara e objetiva em português:\n\nInformações do provedor:\n${summary}\n\nPergunta do cliente: "${text}"\n\nResponda em 2 ou 3 frases:`;
+                const systemInstruction =
+                    'Você é o assistente virtual do provedor de internet 100% Fibra Óptica em Carmo do Cajuru e São José dos Salgados - MG. Responda diretamente e cordialmente em português brasileiro usando apenas os fatos fornecidos.';
+
+                const generated = await this.llmService.generateText(
+                    prompt,
+                    systemInstruction,
+                    undefined,
+                    'qwen2.5:0.5b'
+                );
+
+                if (generated && generated.trim().length > 15 && !generated.startsWith('Service notice:')) {
+                    responseText = generated.trim();
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to generate knowledge inquiry response via LLM: ${(error as Error).message}`);
             }
-        } catch (error) {
-            this.logger.warn(`Failed to generate knowledge inquiry response via LLM: ${(error as Error).message}`);
         }
 
         if (!responseText) {
@@ -222,7 +435,7 @@ export class FlowEngineService {
         }
 
         const options = customer.isIdentified
-            ? ['Qual é o meu plano atual?', 'Ver minhas faturas', 'Falar com atendente']
+            ? ['Qual é o meu plano atual?', 'Ver todos os planos disponíveis', 'Falar com atendente']
             : ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
 
         return {
@@ -246,17 +459,11 @@ export class FlowEngineService {
 
         const currentData = pending.registrationData || {};
         const lowerText = text.toLowerCase();
+        const plans = this.databaseService.getPlans();
 
-        if (lowerText.includes('pro') || lowerText.includes('professional')) {
-            pending.targetPlan = 'Professional';
-        }
-
-        if (lowerText.includes('premium') || lowerText.includes('business')) {
-            pending.targetPlan = 'Premium Business';
-        }
-
-        if (lowerText.includes('starter') || lowerText.includes('barato')) {
-            pending.targetPlan = 'Starter';
+        const matchedCandidate = this.matchTargetPlan(text, plans);
+        if (matchedCandidate) {
+            pending.targetPlan = matchedCandidate.name;
         }
 
         const updatedData = this.extractRegistrationFields(text, currentData);
@@ -286,7 +493,7 @@ export class FlowEngineService {
         const missing = this.getMissingRegistrationFields(updatedData);
 
         if (missing.length > 0) {
-            const targetPlan = pending.targetPlan || 'Starter';
+            const targetPlan = pending.targetPlan || plans[0]?.name || 'Urbano 600 Mega';
             const collectedList: string[] = [];
 
             if (updatedData.name) {
@@ -323,8 +530,7 @@ export class FlowEngineService {
         }
 
         // All required fields present! Issue digital contract
-        const targetPlan = pending.targetPlan || 'Starter';
-        const plans = this.databaseService.getPlans();
+        const targetPlan = pending.targetPlan || plans[0]?.name || 'Urbano 600 Mega';
         const matchedPlan = plans.find((p) => p.name.toLowerCase() === targetPlan.toLowerCase()) || plans[0];
 
         const contractId = `CONT-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -888,21 +1094,7 @@ export class FlowEngineService {
         // 1. Explicit Customer Registration Flow
         if (isRegistration && !lowerText.includes('mudar') && !lowerText.includes('trocar')) {
             const plans = this.databaseService.getPlans();
-            let chosenPlan = plans[0]; // Starter default
-
-            if (lowerText.includes('pro') || lowerText.includes('professional')) {
-                const found = plans.find((p) => p.name === 'Professional');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
-
-            if (lowerText.includes('premium') || lowerText.includes('business')) {
-                const found = plans.find((p) => p.name === 'Premium Business');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
+            const chosenPlan = this.matchTargetPlan(text, plans);
 
             const initialData = this.extractRegistrationFields(text, {});
             session.pendingAction = {
@@ -929,17 +1121,18 @@ export class FlowEngineService {
                 }
             }
 
-            const planLines = plans.map(
-                (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
-            );
-
             const response =
-                `Seja muito bem-vindo! Ficamos felizes com seu interesse em se tornar nosso cliente.\n\n` +
-                `Aqui estão nossos planos de assinatura disponíveis:\n\n${planLines.join('\n')}\n\n` +
+                `Seja muito bem-vindo ao nosso atendimento!\n\n` +
+                `${this.formatPlansMessage(plans)}\n\n` +
                 `Qual destes planos você gostaria de contratar para iniciarmos seu cadastro?\n\n` +
-                `*(Se preferir, você também já pode nos enviar seus dados: Nome completo, CPF, E-mail, Telefone com DDD e Endereço completo de instalação!)*`;
+                `*(Se preferir, você também já pode nos enviar seus dados: Nome completo, CPF, E-mail, Telefone com DDD e Endereço completo com cidade/distrito!)*`;
 
-            const options = ['Quero o plano Starter', 'Quero o plano Professional', 'Quero o plano Premium Business'];
+            const options = [
+                'Quero Urbano 600 Mega (R$ 79,99)',
+                'Quero Urbano 800 Mega (R$ 89,99)',
+                'Quero Rural 600 Mega (R$ 99,99)',
+                'Consultar cobertura / viabilidade',
+            ];
 
             return {
                 isHandled: true,
@@ -954,35 +1147,31 @@ export class FlowEngineService {
         if (isSubscription && !lowerText.includes('mudar') && !lowerText.includes('trocar')) {
             const plans = this.databaseService.getPlans();
             const hasSpecificPlan =
-                lowerText.includes('pro') ||
-                lowerText.includes('professional') ||
-                lowerText.includes('premium') ||
-                lowerText.includes('business') ||
-                lowerText.includes('starter') ||
-                lowerText.includes('barato') ||
-                lowerText.includes('49') ||
-                lowerText.includes('99') ||
-                lowerText.includes('150');
+                lowerText.includes('600') ||
+                lowerText.includes('800') ||
+                lowerText.includes('1gb') ||
+                lowerText.includes('1 giga') ||
+                lowerText.includes('1000') ||
+                lowerText.includes('urbano') ||
+                lowerText.includes('rural') ||
+                lowerText.includes('barato');
 
             if (!hasSpecificPlan) {
-                const planLines = plans.map(
-                    (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
-                );
-
                 const response =
-                    `Excelente! Ficamos felizes com seu interesse em assinar nossos serviços.\n\n` +
-                    `Aqui estão nossos planos disponíveis para contratação:\n\n${planLines.join('\n')}\n\n` +
+                    `Excelente! Ficamos felizes com seu interesse em assinar nossa internet 100% Fibra Óptica.\n\n` +
+                    `${this.formatPlansMessage(plans)}\n\n` +
                     `Qual destes planos você gostaria de contratar para iniciarmos seu cadastro?`;
 
                 const options = [
-                    'Quero o plano Starter',
-                    'Quero o plano Professional',
-                    'Quero o plano Premium Business',
+                    'Quero Urbano 600 Mega (R$ 79,99)',
+                    'Quero Urbano 800 Mega (R$ 89,99)',
+                    'Quero Rural 600 Mega (R$ 99,99)',
+                    'Consultar cobertura / viabilidade',
                 ];
 
                 session.pendingAction = {
                     type: 'new_subscription',
-                    targetPlan: 'Starter',
+                    targetPlan: plans[0]?.name || 'Urbano 600 Mega',
                     registrationData: {},
                     description: 'Contratação de assinatura',
                     createdAt: Date.now(),
@@ -997,28 +1186,7 @@ export class FlowEngineService {
                 };
             }
 
-            let chosenPlan = plans[0]; // Starter default
-
-            if (lowerText.includes('pro') || lowerText.includes('professional')) {
-                const found = plans.find((p) => p.name === 'Professional');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
-
-            if (lowerText.includes('premium') || lowerText.includes('business')) {
-                const found = plans.find((p) => p.name === 'Premium Business');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
-
-            if (lowerText.includes('starter') || lowerText.includes('barato') || lowerText.includes('49')) {
-                const found = plans.find((p) => p.name === 'Starter');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
+            const chosenPlan = this.matchTargetPlan(text, plans);
 
             session.pendingAction = {
                 type: 'new_subscription',
@@ -1044,10 +1212,10 @@ export class FlowEngineService {
                 }
             }
 
-            const response = `Excelente escolha! O plano **${chosenPlan.name}** (**R$ ${chosenPlan.price.toFixed(2)}/mês**) oferece ${chosenPlan.features.join(', ')}.\n\nPara gerarmos seu contrato digital e ativarmos sua conexão, precisamos dos seus dados cadastrais:\n• **Nome completo**\n• **CPF**\n• **E-mail**\n• **Telefone com DDD**\n• **Endereço completo de instalação**\n\n*(Você pode nos enviar todos os dados juntos em uma única mensagem ou aos poucos, como preferir!)*`;
+            const response = `Excelente escolha! O plano **${chosenPlan.name}** (**R$ ${chosenPlan.price.toFixed(2)}/mês**) oferece ${chosenPlan.features.join(', ')}.\n\nPara gerarmos seu contrato digital e ativarmos sua conexão 100% Fibra Óptica, precisamos dos seus dados cadastrais:\n• **Nome completo**\n• **CPF**\n• **E-mail**\n• **Telefone com DDD**\n• **Endereço completo de instalação (com bairro e cidade/distrito)**\n\n*(Você pode nos enviar todos os dados juntos em uma única mensagem ou aos poucos, como preferir!)*`;
 
             const options = [
-                'Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120',
+                'Carlos Silva, CPF 123.456.789-00, carlos@example.com, (37) 99888-7777, R. Tiradentes, 100 - Carmo do Cajuru',
                 'Ver outros planos',
                 'Cancelar contratação',
             ];
@@ -1104,14 +1272,12 @@ export class FlowEngineService {
         if (analysis.primaryIntent === 'plan_pricing') {
             const pricingNode = this.findNode(flow, 'node_plan_pricing_action');
             const plans = this.databaseService.getPlans();
-            const planLines = plans.map(
-                (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
-            );
-            const response = `Aqui estão nossos planos de assinatura disponíveis:\n\n${planLines.join('\n')}\n\nQual plano você gostaria de assinar? Ou, se já for cliente, informe seu telefone ou CPF para acessar sua conta!`;
+            const response = `${this.formatPlansMessage(plans)}\n\nQual plano você gostaria de assinar? Ou, se já for cliente, informe seu telefone ou CPF para acessar sua conta!`;
             const options = [
-                'Quero o plano Starter',
-                'Quero o plano Professional',
-                'Quero o plano Premium Business',
+                'Quero Urbano 600 Mega (R$ 79,99)',
+                'Quero Urbano 800 Mega (R$ 89,99)',
+                'Quero Rural 600 Mega (R$ 99,99)',
+                'Consultar cobertura / viabilidade',
                 'Já sou cliente (informar telefone)',
             ];
 
@@ -1162,7 +1328,101 @@ export class FlowEngineService {
         const plans = this.databaseService.getPlans();
         const lowerText = text.toLowerCase();
 
-        // 1. Address Change Intent (Takes precedence if user explicitly mentions address)
+        // 1. Current Plan Information Query
+        const isCurrentPlanQuery =
+            lowerText.includes('qual é o meu plano') ||
+            lowerText.includes('qual e o meu plano') ||
+            lowerText.includes('qual o meu plano') ||
+            lowerText.includes('qual meu plano') ||
+            lowerText.includes('meu plano atual') ||
+            lowerText.includes('consultar meu plano') ||
+            lowerText.includes('ver meu plano') ||
+            lowerText.includes('saber meu plano') ||
+            (lowerText.includes('meu plano') &&
+                !lowerText.includes('mudar') &&
+                !lowerText.includes('trocar') &&
+                !lowerText.includes('alterar') &&
+                !lowerText.includes('cancelar'));
+
+        if (isCurrentPlanQuery) {
+            const currentPlanName = customer.plan || 'Urbano 600 Mega';
+            const currentPlan = (plans as Plan[]).find((p) => p.name.toLowerCase() === currentPlanName.toLowerCase());
+            const priceStr = currentPlan ? ` (R$ ${currentPlan.price.toFixed(2)}/mês)` : '';
+            const featuresStr =
+                currentPlan && currentPlan.features && currentPlan.features.length > 0
+                    ? `\n\n**Recursos e benefícios:**\n${currentPlan.features.map((f) => `• ${f}`).join('\n')}`
+                    : '';
+
+            const statusStr = customer.plan ? 'Ativo 🟢' : 'Sem plano ativo';
+            const response = `Você está utilizando atualmente o plano **"${currentPlanName}"**${priceStr}.${featuresStr}\n\nStatus da assinatura: **${statusStr}**.\n\nComo posso te ajudar em relação ao seu plano?`;
+            const options = [
+                'Quero mudar para o plano mais barato',
+                'Ver todos os planos disponíveis',
+                'Ver faturas e 2ª via',
+                'Suporte técnico',
+                'Menu principal',
+            ];
+
+            return { response, nodeId: 'node_plan_pricing_action', options };
+        }
+
+        // 2. Customer Profile Data Query / Identifier Confirmation
+        const candidateIdentifier = analysis.extractedIdentifier || this.extractPhoneOrCpf(text);
+        const isCustomerDataQuery =
+            lowerText.includes('meus dados') ||
+            lowerText.includes('meu cadastro') ||
+            lowerText.includes('dados cadastrais') ||
+            lowerText.includes('telefone cadastrado') ||
+            lowerText.includes('cpf cadastrado') ||
+            lowerText.includes('meu telefone') ||
+            lowerText.includes('meu cpf') ||
+            lowerText.includes('consultar cadastro');
+
+        if (isCustomerDataQuery || candidateIdentifier) {
+            if (candidateIdentifier) {
+                const matchedOther = this.databaseService.findCustomerByIdentifier(candidateIdentifier);
+
+                if (matchedOther && matchedOther.id !== customer.id) {
+                    matchedOther.isIdentified = true;
+                    this.databaseService.saveCustomer(matchedOther);
+                    session.customerId = matchedOther.id;
+
+                    const response = `Identidade confirmada! Alternamos para a conta de **${matchedOther.name || 'cliente'}**.\nPlano atual: **${matchedOther.plan || 'Sem plano'}**.\n\nComo posso te ajudar hoje?`;
+                    const options = [
+                        'Qual é o meu plano atual?',
+                        'Quero mudar para o plano mais barato',
+                        'Ver minhas faturas',
+                        'Suporte técnico',
+                    ];
+
+                    return { response, nodeId: 'node_customer_auth_action', options, updatedCustomer: matchedOther };
+                }
+            }
+
+            const addressStr = (customer.metadata?.address as string) || 'Não cadastrado';
+            const phoneStr = customer.phone || customer.id || 'Não informado';
+            const cpfStr = customer.cpfCnpj || 'Cadastrado';
+            const response =
+                `📄 **Seus Dados Cadastrais:**\n\n` +
+                `👤 **Titular:** ${customer.name || 'Cliente'}\n` +
+                `📱 **Telefone / WhatsApp:** \`${phoneStr}\`\n` +
+                `🆔 **CPF:** \`${cpfStr}\`\n` +
+                `📍 **Endereço de Instalação:** ${addressStr}\n` +
+                `📦 **Plano Ativo:** ${customer.plan || 'Nenhum'}\n\n` +
+                `Seus dados estão sincronizados e válidos em nossa base de assinantes!`;
+
+            const options = [
+                'Qual é o meu plano atual?',
+                'Alterar endereço cadastral',
+                'Quero mudar para o plano mais barato',
+                'Ver faturas e 2ª via',
+                'Menu principal',
+            ];
+
+            return { response, nodeId: 'node_customer_auth_action', options };
+        }
+
+        // 3. Address Change Intent (Takes precedence if user explicitly mentions address)
         const userExplicitAddress = this.extractAddressFromText(text);
         const isAddressChangeIntent =
             Boolean(userExplicitAddress) ||
@@ -1279,14 +1539,11 @@ export class FlowEngineService {
 
         // 6. Plan Pricing Inquiries
         if (analysis.primaryIntent === 'plan_pricing') {
-            const planList = plans
-                .map((p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`)
-                .join('\n');
             const currentPlanNotice = customer.plan
                 ? `Seu plano atual é **"${customer.plan}"**.`
                 : 'Você ainda não possui um plano ativo.';
 
-            const response = `${currentPlanNotice}\n\nPlanos disponíveis:\n${planList}\n\nDeseja mudar de plano ou verificar opções mais econômicas?`;
+            const response = `${currentPlanNotice}\n\n${this.formatPlansMessage(plans as Plan[])}\n\nDeseja mudar de plano ou verificar opções mais econômicas?`;
             const options = ['Quero mudar para o plano mais barato', 'Ver minhas faturas', 'Menu principal'];
 
             return { response, nodeId: 'node_plan_pricing_action', options };
@@ -1357,19 +1614,20 @@ export class FlowEngineService {
         plans: Array<{ id: string; name: string; price: number; features: string[] }>,
         lowerText = ''
     ): StepRoutingOutcome {
-        // 1. Identify specific target plan first (e.g. Professional, Premium Business, Starter)
+        // 1. Identify specific target plan first (e.g. Urbano 800 Mega, Rural 1 Giga)
         let targetPlanName: string | null =
             analysis.targetPlan && analysis.targetPlan !== 'cheapest' ? analysis.targetPlan : null;
 
-        if (!targetPlanName) {
-            if (lowerText.includes('pro') || lowerText.includes('professional')) {
-                targetPlanName = 'Professional';
-            }
-            if (lowerText.includes('premium') || lowerText.includes('business')) {
-                targetPlanName = 'Premium Business';
-            }
-            if (lowerText.includes('starter') && !lowerText.includes('barato')) {
-                targetPlanName = 'Starter';
+        const wantsCheapest =
+            analysis.targetPlan === 'cheapest' ||
+            lowerText.includes('barato') ||
+            lowerText.includes('em conta') ||
+            lowerText.includes('menor valor');
+
+        if (!targetPlanName && !wantsCheapest) {
+            const matchedCandidate = this.matchTargetPlan(lowerText, plans as Plan[]);
+            if (matchedCandidate && matchedCandidate.name !== customer.plan) {
+                targetPlanName = matchedCandidate.name;
             }
         }
 
@@ -1400,12 +1658,6 @@ export class FlowEngineService {
         // 2. User asked for the cheapest plan
         const sortedPlans = [...plans].sort((a, b) => a.price - b.price);
         const cheapestPlan = sortedPlans[0];
-
-        const wantsCheapest =
-            analysis.targetPlan === 'cheapest' ||
-            lowerText.includes('barato') ||
-            lowerText.includes('em conta') ||
-            lowerText.includes('menor valor');
 
         if (wantsCheapest) {
             if (customer.plan === cheapestPlan.name) {

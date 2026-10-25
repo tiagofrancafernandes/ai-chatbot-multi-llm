@@ -3,101 +3,185 @@ import { DatabaseSchema } from '../common/interfaces/database.interface';
 export const INITIAL_DATABASE_DATA: DatabaseSchema = {
     customers: [
         {
-            id: '5511999999999',
-            name: 'John Doe',
+            id: '5537999999999',
+            name: 'João Santos',
             cpfCnpj: '123.456.789-00',
-            phone: '5511999999999',
-            plan: 'Premium Business',
-            notes: 'VIP Customer with high SLA tier',
+            phone: '5537999999999',
+            plan: 'Urbano 600 Mega',
+            notes: 'Cliente residencial urbano em Carmo do Cajuru',
             isIdentified: true,
             invoices: [
                 {
                     id: 'INV-2026-001',
-                    amount: 150.0,
-                    dueDate: '2026-11-05',
-                    status: 'paid',
-                },
-                {
-                    id: 'INV-2026-002',
-                    amount: 150.0,
-                    dueDate: '2026-12-05',
+                    amount: 79.99,
+                    dueDate: '2026-11-10',
                     status: 'pending',
                 },
             ],
             metadata: {
                 contractStart: '2025-01-01',
-                accountManager: 'Alice Smith',
+                cidade: 'Carmo do Cajuru',
             },
         },
         {
-            id: '5511888888888',
+            id: '5537988888888',
             name: 'Maria Silva',
             cpfCnpj: '987.654.321-99',
-            phone: '5511888888888',
-            plan: 'Starter',
-            notes: 'Individual developer account',
+            phone: '5537988888888',
+            plan: 'Rural 600 Mega',
+            notes: 'Cliente em São José dos Salgados',
             isIdentified: true,
             invoices: [
                 {
                     id: 'INV-2026-101',
-                    amount: 49.9,
+                    amount: 99.99,
                     dueDate: '2026-10-10',
                     status: 'paid',
                 },
             ],
             metadata: {
                 contractStart: '2026-03-15',
+                distrito: 'São José dos Salgados',
             },
         },
     ],
     plans: [
         {
-            id: 'plan_starter',
-            name: 'Starter',
-            price: 49.9,
+            id: 'plan_urbano_600',
+            name: 'Urbano 600 Mega',
+            price: 79.99,
             currency: 'BRL',
             billingCycle: 'monthly',
-            features: ['1 Active Seat', 'Community Support', 'Standard API Rate Limit'],
+            area: 'urbano',
+            speed: '600MB',
+            features: [
+                '100% Fibra Óptica',
+                'Download 600 Mbps / Upload simétrico',
+                'Wi-Fi 6 incluso',
+                'Instalação grátis',
+            ],
             isPopular: false,
         },
         {
-            id: 'plan_pro',
-            name: 'Professional',
-            price: 99.9,
+            id: 'plan_urbano_800',
+            name: 'Urbano 800 Mega',
+            price: 89.99,
             currency: 'BRL',
             billingCycle: 'monthly',
-            features: ['5 Active Seats', 'Priority Email Support', 'Higher Rate Limits', 'Custom Webhooks'],
+            area: 'urbano',
+            speed: '800MB',
+            features: [
+                '100% Fibra Óptica',
+                'Download 800 Mbps / Upload simétrico',
+                'Wi-Fi 6 incluso',
+                'Instalação grátis',
+            ],
             isPopular: true,
         },
         {
-            id: 'plan_enterprise',
-            name: 'Premium Business',
-            price: 150.0,
+            id: 'plan_urbano_1gb',
+            name: 'Urbano 1 Giga',
+            price: 99.99,
             currency: 'BRL',
             billingCycle: 'monthly',
-            features: ['Unlimited Seats', '24/7 Dedicated Phone Support', 'Dedicated IP', 'Custom Multi-LLM Routers'],
+            area: 'urbano',
+            speed: '1GB',
+            features: [
+                '100% Fibra Óptica Ultra Velocidade',
+                'Download 1000 Mbps (1 Gbps)',
+                'Wi-Fi 6 de alta performance',
+                'Instalação grátis',
+            ],
+            isPopular: false,
+        },
+        {
+            id: 'plan_rural_600',
+            name: 'Rural 600 Mega',
+            price: 99.99,
+            currency: 'BRL',
+            billingCycle: 'monthly',
+            area: 'rural',
+            speed: '600MB',
+            features: [
+                '100% Fibra Óptica Rural',
+                'Download 600 Mbps',
+                'Wi-Fi incluso',
+                'Taxa de instalação sob consulta',
+            ],
+            isPopular: false,
+        },
+        {
+            id: 'plan_rural_800',
+            name: 'Rural 800 Mega',
+            price: 110.99,
+            currency: 'BRL',
+            billingCycle: 'monthly',
+            area: 'rural',
+            speed: '800MB',
+            features: [
+                '100% Fibra Óptica Rural',
+                'Download 800 Mbps',
+                'Wi-Fi incluso',
+                'Taxa de instalação sob consulta',
+            ],
+            isPopular: true,
+        },
+        {
+            id: 'plan_rural_1gb',
+            name: 'Rural 1 Giga',
+            price: 120.99,
+            currency: 'BRL',
+            billingCycle: 'monthly',
+            area: 'rural',
+            speed: '1GB',
+            features: [
+                '100% Fibra Óptica Rural Ultra',
+                'Download 1000 Mbps (1 Gbps)',
+                'Wi-Fi Gigabit de alta performance',
+                'Taxa de instalação sob consulta',
+            ],
             isPopular: false,
         },
     ],
     businessHours: {
         open: '08:00',
         close: '18:00',
-        days: 'Monday to Friday',
+        days: 'Segunda a Sexta: 08h às 18h | Sábado: 08h às 12h',
         timezone: 'America/Sao_Paulo',
     },
     sessions: [],
     contracts: [],
     knowledgeBase: {
         companyRules:
-            'A Telecom Connect oferece atendimento presencial e suporte técnico especializado.\n' +
-            'Endereço: Av. Paulista, 1000, Bela Vista, São Paulo - SP, CEP 01310-100.\n' +
-            'Horário regular de atendimento presencial e telefônico: Segunda a Sexta-feira, das 08h às 18h.\n' +
-            'Suporte técnico de emergência para empresas: 24/7 via WhatsApp e Portal do Cliente.\n' +
+            'Provedor de Internet 100% Fibra Óptica, especializado em internet residencial e soluções de conectividade para empresas.\n' +
+            'Endereço: R. Tiradentes, 405 - Carmo do Cajuru, MG, CEP 35510-000.\n' +
+            'Telefone: (37) 3333-4444 | E-mail: comercial@minhainternet.com.\n' +
+            'Horário de Atendimento presencial e telefônico: Segunda a Sexta: 08h às 18h | Sábado: 08h às 12h.\n\n' +
+            'Áreas Atendidas / Cobertura:\n' +
+            '• Carmo do Cajuru - MG: 100% da área urbana atendida e parcialmente a zona rural nas proximidades da cidade.\n' +
+            '• São José dos Salgados - MG (distrito de Carmo do Cajuru): 100% da área urbana atendida e parcialmente a zona rural nas proximidades.\n\n' +
+            'Planos de Internet Fibra Óptica para Área Urbana:\n' +
+            '• 600 Mega: R$ 79,99/mês (Instalação grátis, Wi-Fi incluso)\n' +
+            '• 800 Mega: R$ 89,99/mês (Instalação grátis, Wi-Fi incluso)\n' +
+            '• 1 Giga: R$ 99,99/mês (Instalação grátis, Wi-Fi 6 de alta velocidade)\n\n' +
+            'Planos de Internet Fibra Óptica para Área Rural:\n' +
+            '• 600 Mega: R$ 99,99/mês\n' +
+            '• 800 Mega: R$ 110,99/mês\n' +
+            '• 1 Giga: R$ 120,99/mês\n' +
+            '(Na área rural, pode haver cobrança de taxa de instalação dependendo do ponto de instalação em relação à rede cabeada).\n\n' +
+            'Serviços Corporativos e Equipamentos Adicionais:\n' +
+            '• Venda de roteadores adicionais e implantação de Rede Mesh (cobertura total em residências e empresas);\n' +
+            '• Wi-Fi Corporativo gerenciado;\n' +
+            '• Links Dedicados para empresas com garantia de banda e SLA;\n' +
+            'Obs: Preços e condições de roteadores, Wi-Fi corporativo e links dedicados são a combinar sob consulta, dependendo da análise de necessidade para precificação.\n\n' +
             'Formas de pagamento aceitas: Boletos bancários, PIX com compensação imediata e cartão de crédito.',
         additionalInstructions:
-            'Aviso de Feriado/Exceção: Na próxima quarta-feira, a sede presencial estará fechada das 12h às 18h para manutenção preventiva da rede elétrica. O atendimento online e telefônico continuará operando normalmente.',
+            'Avisos e Políticas de Atendimento:\n' +
+            '• Toda a internet é 100% entregue via Fibra Óptica de ponta a ponta.\n' +
+            '• Para clientes da zona rural, orientar o envio da localização ou ponto de referência para que nossa equipe técnica verifique a distância da rede e o valor da taxa de instalação.\n' +
+            '• Para rede mesh, links dedicados e Wi-Fi corporativo, coletar telefone de contato para um especialista comercial entrar em contato.',
         cachedSummary:
-            'Telecom Connect: Atendimento presencial na Av. Paulista, 1000, SP. Horário regular: seg-sex 08h-18h. Suporte emergencial empresas 24/7. Pagamentos via PIX, boleto e cartão. Aviso especial: Quarta-feira sede presencial fechada das 12h às 18h para manutenção elétrica, mas canais online e telefônicos operam normalmente.',
+            'Provedor 100% Fibra Óptica em Carmo do Cajuru e São José dos Salgados - MG. Endereço: R. Tiradentes, 405, Carmo do Cajuru - MG. Tel: (37) 3333-4444, comercial@minhainternet.com. Atendimento: Seg-Sex 08h-18h, Sáb 08h-12h. Cobertura: 100% urbana e proximidades rurais em Carmo do Cajuru e São José dos Salgados. Planos Urbanos: 600MB (R$ 79,99), 800MB (R$ 89,99), 1GB (R$ 99,99) com instalação grátis. Planos Rurais: 600MB (R$ 99,99), 800MB (R$ 110,99), 1GB (R$ 120,99), com taxa de instalação sob consulta do ponto. Rede Mesh, Wi-Fi corporativo e Links Dedicados são à combinar sob análise de necessidade.',
         lastCompiledAt: Date.now(),
     },
     flow: {
