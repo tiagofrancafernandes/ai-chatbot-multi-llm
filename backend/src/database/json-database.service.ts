@@ -1,0 +1,287 @@
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as path from 'path';
+import { DatabaseSchema } from '../common/interfaces/database.interface';
+import { Customer } from '../common/interfaces/customer.interface';
+import { Plan } from '../common/interfaces/plan.interface';
+import { BusinessHours } from '../common/interfaces/business-hours.interface';
+import { ChatSession } from '../common/interfaces/chat.interface';
+import { FlowDefinition } from '../common/interfaces/flow.interface';
+import { INITIAL_DATABASE_DATA } from './default-database';
+
+@Injectable()
+export class JsonDatabaseService implements OnModuleInit {
+    private readonly logger = new Logger(JsonDatabaseService.name);
+    private databaseFilePath = '';
+    private cache: DatabaseSchema | null = null;
+
+    constructor(private readonly configService: ConfigService) {}
+
+    public onModuleInit(): void {
+        const configuredPath = this.configService.get<string>('DATABASE_FILE_PATH');
+
+        if (configuredPath) {
+            this.databaseFilePath = path.resolve(configuredPath);
+        }
+
+        if (!configuredPath) {
+            this.databaseFilePath = path.resolve(process.cwd(), 'data', 'db.json');
+        }
+
+        this.ensureDatabaseFileExists();
+        this.loadDatabase();
+        this.logger.log(`JSON Database initialized at path: ${this.databaseFilePath}`);
+    }
+
+    public getDatabase(): DatabaseSchema {
+        if (!this.cache) {
+            this.loadDatabase();
+        }
+
+        return this.cache as DatabaseSchema;
+    }
+
+    public saveDatabase(database: DatabaseSchema): void {
+        if (!database) {
+            throw new Error('Database payload cannot be undefined or null');
+        }
+
+        this.cache = database;
+
+        const directoryPath = path.dirname(this.databaseFilePath);
+
+        if (!fs.existsSync(directoryPath)) {
+            fs.mkdirSync(directoryPath, { recursive: true });
+        }
+
+        const serialized = JSON.stringify(database, null, 4);
+
+        fs.writeFileSync(this.databaseFilePath, serialized, 'utf-8');
+    }
+
+    public getCustomers(): Customer[] {
+        const currentDatabase = this.getDatabase();
+
+        return currentDatabase.customers;
+    }
+
+    public findCustomerById(customerId: string): Customer | undefined {
+        if (!customerId) {
+            return undefined;
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const customer = currentDatabase.customers.find((item) => {
+            return item.id === customerId;
+        });
+
+        return customer;
+    }
+
+    public findCustomerByIdentifier(identifier: string): Customer | undefined {
+        if (!identifier) {
+            return undefined;
+        }
+
+        const normalized = identifier.trim();
+
+        if (!normalized) {
+            return undefined;
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const customer = currentDatabase.customers.find((item) => {
+            const matchesId = item.id === normalized;
+            const matchesPhone = item.phone === normalized;
+            const matchesCpfCnpj = item.cpfCnpj === normalized;
+
+            return matchesId || matchesPhone || matchesCpfCnpj;
+        });
+
+        return customer;
+    }
+
+    public saveCustomer(customer: Customer): Customer {
+        if (!customer) {
+            throw new Error('Customer cannot be null or undefined');
+        }
+
+        if (!customer.id) {
+            throw new Error('Customer ID is required');
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const existingIndex = currentDatabase.customers.findIndex((item) => {
+            return item.id === customer.id;
+        });
+
+        if (existingIndex >= 0) {
+            currentDatabase.customers[existingIndex] = customer;
+            this.saveDatabase(currentDatabase);
+            return customer;
+        }
+
+        currentDatabase.customers.push(customer);
+
+        this.saveDatabase(currentDatabase);
+
+        return customer;
+    }
+
+    public getPlans(): Plan[] {
+        const currentDatabase = this.getDatabase();
+
+        return currentDatabase.plans;
+    }
+
+    public getBusinessHours(): BusinessHours {
+        const currentDatabase = this.getDatabase();
+
+        return currentDatabase.businessHours;
+    }
+
+    public getSessions(): ChatSession[] {
+        const currentDatabase = this.getDatabase();
+
+        return currentDatabase.sessions;
+    }
+
+    public findSessionByCustomerId(customerId: string): ChatSession | undefined {
+        if (!customerId) {
+            return undefined;
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const session = currentDatabase.sessions.find((item) => {
+            return item.customerId === customerId;
+        });
+
+        return session;
+    }
+
+    public findSessionById(sessionId: string): ChatSession | undefined {
+        if (!sessionId) {
+            return undefined;
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const session = currentDatabase.sessions.find((item) => {
+            return item.id === sessionId;
+        });
+
+        return session;
+    }
+
+    public saveSession(session: ChatSession): ChatSession {
+        if (!session) {
+            throw new Error('Session cannot be null or undefined');
+        }
+
+        if (!session.id) {
+            throw new Error('Session ID is required');
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const existingIndex = currentDatabase.sessions.findIndex((item) => {
+            return item.id === session.id;
+        });
+
+        if (existingIndex >= 0) {
+            currentDatabase.sessions[existingIndex] = session;
+            this.saveDatabase(currentDatabase);
+            return session;
+        }
+
+        currentDatabase.sessions.push(session);
+
+        this.saveDatabase(currentDatabase);
+
+        return session;
+    }
+
+    public deleteSessionByCustomerId(customerId: string): boolean {
+        if (!customerId) {
+            return false;
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        const initialLength = currentDatabase.sessions.length;
+
+        currentDatabase.sessions = currentDatabase.sessions.filter((item) => {
+            return item.customerId !== customerId;
+        });
+
+        const wasRemoved = currentDatabase.sessions.length < initialLength;
+
+        if (wasRemoved) {
+            this.saveDatabase(currentDatabase);
+        }
+
+        return wasRemoved;
+    }
+
+    public getFlow(): FlowDefinition {
+        const currentDatabase = this.getDatabase();
+
+        return currentDatabase.flow;
+    }
+
+    public saveFlow(flow: FlowDefinition): FlowDefinition {
+        if (!flow) {
+            throw new Error('Flow definition cannot be null or undefined');
+        }
+
+        if (!flow.id) {
+            throw new Error('Flow ID is required');
+        }
+
+        const currentDatabase = this.getDatabase();
+
+        currentDatabase.flow = flow;
+
+        this.saveDatabase(currentDatabase);
+
+        return flow;
+    }
+
+    private ensureDatabaseFileExists(): void {
+        const directoryPath = path.dirname(this.databaseFilePath);
+
+        if (!fs.existsSync(directoryPath)) {
+            fs.mkdirSync(directoryPath, { recursive: true });
+        }
+
+        if (fs.existsSync(this.databaseFilePath)) {
+            return;
+        }
+
+        this.logger.log('Database file not found. Populating with initial mock data...');
+
+        const serialized = JSON.stringify(INITIAL_DATABASE_DATA, null, 4);
+
+        fs.writeFileSync(this.databaseFilePath, serialized, 'utf-8');
+    }
+
+    private loadDatabase(): void {
+        if (!fs.existsSync(this.databaseFilePath)) {
+            this.ensureDatabaseFileExists();
+        }
+
+        try {
+            const fileContent = fs.readFileSync(this.databaseFilePath, 'utf-8');
+            this.cache = JSON.parse(fileContent);
+        } catch (error) {
+            this.logger.error(`Error reading database file: ${(error as Error).message}. Resetting to initial data.`);
+            this.cache = INITIAL_DATABASE_DATA;
+            this.saveDatabase(INITIAL_DATABASE_DATA);
+        }
+    }
+}

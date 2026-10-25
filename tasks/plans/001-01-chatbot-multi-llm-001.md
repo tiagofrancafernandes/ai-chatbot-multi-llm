@@ -24,7 +24,7 @@ Construir uma aplicação completa de Chatbot com Frontend e Backend:
 ## Escopo de Tarefas
 
 - [x] Task 1: Setup do ambiente, workspace, .gitignore, .env.example e Docker compose (`tasks/tasks/001-01-environment-and-structure-001.md`)
-- [ ] Task 2: Backend NestJS Core & JSON Database Engine com Mock inicial (`tasks/tasks/001-02-backend-nestjs-core-and-db-001.md`)
+- [x] Task 2: Backend NestJS Core & JSON Database Engine com Mock inicial (`tasks/tasks/001-02-backend-nestjs-core-and-db-001.md`)
 - [ ] Task 3: Provedores Multi-LLM (Ollama SystemOne, Gemini, OpenAI) e Motor de Fluxo Configurável (`tasks/tasks/001-03-backend-llm-providers-and-flow-001.md`)
 - [ ] Task 4: API REST do Chat, Customers e Demo Requests (.http) (`tasks/tasks/001-04-backend-chat-api-and-demo-requests-001.md`)
 - [ ] Task 5: Frontend Vue 3 + Tailwind v4 + Vue3-Toastify + Iconify (`tasks/tasks/001-05-frontend-vue3-tailwind-toastify-001.md`)
