@@ -1,0 +1,98 @@
+### Configuration Variables
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### 1. Initialize or Resume Chat Session (Guest)
+# @name initChatGuest
+POST {{baseUrl}}/chat/init
+Content-Type: {{contentType}}
+
+{
+    "customerId": ""
+}
+
+### 2. Initialize or Resume Chat Session (Mock Customer John Doe)
+# @name initChatIdentified
+POST {{baseUrl}}/chat/init
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999"
+}
+
+### 3. Send Message - Greeting Intent
+# @name sendGreeting
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Olá, bom dia!"
+}
+
+### 4. Send Message - Technical Support + Secondary Request (Invoice)
+# @name sendSupportWithInvoiceRequest
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "O sistema caiu de novo. Aproveitando, vocês podem me mandar a segunda via da fatura deste mês?"
+}
+
+### 5. Send Message - Plan Pricing Inquiry
+# @name sendPricingInquiry
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Quais são os planos e preços disponíveis para upgrade?"
+}
+
+### 6. Send Message - Financial Inquiry
+# @name sendFinancialInquiry
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Gostaria de consultar minhas faturas e extrato de pagamentos."
+}
+
+### 7. Send Message - Guest Customer Providing Phone Authentication
+# @name sendGuestAuthentication
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_123456",
+    "text": "Meu telefone cadastrado é 5511999999999"
+}
+
+### 8. Get Chat History for Customer
+# @name getChatHistory
+GET {{baseUrl}}/chat/history?customerId=5511999999999
+
+### 9. Get Available Providers and Active Model
+# @name getProviders
+GET {{baseUrl}}/chat/providers
+
+### 10. Switch Active Provider (e.g. to Gemini or Ollama)
+# @name switchProvider
+POST {{baseUrl}}/chat/providers/switch
+Content-Type: {{contentType}}
+
+{
+    "providerId": "gemini",
+    "model": "gemini-1.5-flash"
+}
+
+### 11. Reset Customer Chat Session
+# @name resetChatSession
+POST {{baseUrl}}/chat/reset
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999"
+}

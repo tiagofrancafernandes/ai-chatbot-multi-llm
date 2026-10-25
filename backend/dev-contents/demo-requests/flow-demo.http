@@ -1,0 +1,74 @@
+### Configuration Variables
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### 1. Get Current Configurable Flow Definition
+# @name getFlowDefinition
+GET {{baseUrl}}/flow
+
+### 2. Update Flow Definition
+# @name updateFlowDefinition
+PUT {{baseUrl}}/flow
+Content-Type: {{contentType}}
+
+{
+    "id": "default_flow_v1",
+    "name": "Standard Customer Service & Intent Router Flow",
+    "entryNodeId": "node_intent_decision",
+    "nodes": [
+        {
+            "id": "node_intent_decision",
+            "name": "AI Intent Analysis Node",
+            "type": "decision",
+            "description": "Analyzes user prompt with SystemOne or Structured LLM to infer intents",
+            "transitions": [
+                {
+                    "id": "trans_to_auth",
+                    "targetNodeId": "node_customer_auth_action",
+                    "condition": {
+                        "type": "is_not_identified"
+                    }
+                },
+                {
+                    "id": "trans_to_greeting",
+                    "targetNodeId": "node_greeting_message",
+                    "condition": {
+                        "type": "intent_equals",
+                        "value": "greeting"
+                    }
+                },
+                {
+                    "id": "trans_to_pricing",
+                    "targetNodeId": "node_plan_pricing_action",
+                    "condition": {
+                        "type": "intent_equals",
+                        "value": "plan_pricing"
+                    }
+                },
+                {
+                    "id": "trans_to_tech_support",
+                    "targetNodeId": "node_tech_support_message",
+                    "condition": {
+                        "type": "intent_equals",
+                        "value": "technical_support"
+                    }
+                },
+                {
+                    "id": "trans_to_financial",
+                    "targetNodeId": "node_financial_action",
+                    "condition": {
+                        "type": "intent_equals",
+                        "value": "financial"
+                    }
+                },
+                {
+                    "id": "trans_to_default",
+                    "targetNodeId": "node_fallback_message",
+                    "condition": {
+                        "type": "default"
+                    }
+                }
+            ]
+        }
+    ]
+}

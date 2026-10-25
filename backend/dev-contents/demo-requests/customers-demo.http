@@ -1,0 +1,46 @@
+### Configuration Variables
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### 1. List All Customers
+# @name listCustomers
+GET {{baseUrl}}/customers
+
+### 2. Get Customer By Phone / ID
+# @name getCustomerById
+GET {{baseUrl}}/customers/5511999999999
+
+### 3. Get Customer By CPF
+# @name getCustomerByCpf
+GET {{baseUrl}}/customers/123.456.789-00
+
+### 4. Create or Update Customer
+# @name saveCustomer
+POST {{baseUrl}}/customers
+Content-Type: {{contentType}}
+
+{
+    "id": "5511977777777",
+    "name": "Carlos Eduardo",
+    "cpfCnpj": "444.555.666-77",
+    "phone": "5511977777777",
+    "plan": "Professional",
+    "notes": "Interested in custom multi-llm integrations",
+    "isIdentified": true,
+    "invoices": [
+        {
+            "id": "INV-2026-901",
+            "amount": 99.90,
+            "dueDate": "2026-11-15",
+            "status": "pending"
+        }
+    ]
+}
+
+### 5. List Available Subscription Plans
+# @name listPlans
+GET {{baseUrl}}/plans
+
+### 6. Get Business Hours
+# @name getBusinessHours
+GET {{baseUrl}}/business-hours
