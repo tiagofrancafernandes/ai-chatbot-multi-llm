@@ -1,0 +1,62 @@
+######### [VARS] #################################
+@BASE_URL=http://localhost:3001
+@CUSTOMER_REF_TYPE=phone
+@CUSTOMER_REF=5511999999999
+@CUSTOMER_CPF=123.456.789-00
+@NEW_CUSTOMER_PHONE=5511977777777
+@AUTH_TOKEN=dev-bearer-token-example
+######### [END VARS] #################################
+
+### 1. List All Registered Customers
+# @name listCustomers
+GET {{BASE_URL}}/api/customers
+Accept: application/json
+
+### 2. Get Customer Profile by Phone / ID
+# @name getCustomerByPhone
+GET {{BASE_URL}}/api/customers/{{CUSTOMER_REF}}
+Accept: application/json
+
+### 3. Get Customer Profile by CPF
+# @name getCustomerByCpf
+GET {{BASE_URL}}/api/customers/{{CUSTOMER_CPF}}
+Accept: application/json
+
+### 4. Create or Update Customer Profile
+# @name saveCustomer
+POST {{BASE_URL}}/api/customers
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "id": "{{NEW_CUSTOMER_PHONE}}",
+    "name": "Carlos Eduardo",
+    "cpfCnpj": "444.555.666-77",
+    "phone": "{{NEW_CUSTOMER_PHONE}}",
+    "plan": "Professional",
+    "notes": "Corporate customer with custom SLA requirements",
+    "isIdentified": true,
+    "invoices": [
+        {
+            "id": "INV-2026-901",
+            "amount": 99.90,
+            "dueDate": "2026-11-15",
+            "status": "pending"
+        }
+    ],
+    "metadata": {
+        "onboardedVia": "dev-requests",
+        "segment": "enterprise"
+    }
+}
+
+### 5. List Available Subscription Plans
+# @name listPlans
+GET {{BASE_URL}}/api/plans
+Accept: application/json
+
+### 6. Get Operating Business Hours
+# @name getBusinessHours
+GET {{BASE_URL}}/api/business-hours
+Accept: application/json

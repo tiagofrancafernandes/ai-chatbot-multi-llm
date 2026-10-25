@@ -1,0 +1,145 @@
+######### [VARS] #################################
+@BASE_URL=http://localhost:3001
+@CUSTOMER_REF_TYPE=phone
+@CUSTOMER_REF=5511999999999
+@CUSTOMER_CPF=123.456.789-00
+@GUEST_CUSTOMER_ID=guest_{{$timestamp}}
+@AUTH_TOKEN=dev-bearer-token-example
+######### [END VARS] #################################
+
+### 1. List Active LLM Providers
+# @name listProviders
+GET {{BASE_URL}}/api/chat/providers
+Accept: application/json
+
+### 2. Switch Active Provider to Ollama (tev1:0.8b decision model)
+# @name switchToOllama
+POST {{BASE_URL}}/api/chat/providers/switch
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "providerId": "ollama",
+    "model": "tev1:0.8b"
+}
+
+### 3. Switch Active Provider to Gemini (gemini-3.5-flash-lite)
+# @name switchToGemini
+POST {{BASE_URL}}/api/chat/providers/switch
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "providerId": "gemini",
+    "model": "gemini-3.5-flash-lite"
+}
+
+### 4. Initialize Chat Session for Guest (Unidentified Customer)
+# @name initGuestChat
+POST {{BASE_URL}}/api/chat/init
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}"
+}
+
+### 5. Initialize or Resume Chat Session for Identified Customer
+# @name initIdentifiedChat
+POST {{BASE_URL}}/api/chat/init
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{CUSTOMER_REF}}"
+}
+
+### 6. Send Message - Greeting Intent
+# @name sendGreeting
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Olá, bom dia!",
+    "providerId": "ollama",
+    "model": "tev1:0.8b"
+}
+
+### 7. Send Message - Complex Intent (Technical Support + Invoice Request Auto-Trigger)
+# @name sendSupportWithInvoiceRequest
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "O sistema caiu de novo. Aproveitando, vocês podem me mandar a segunda via da fatura deste mês?",
+    "providerId": "ollama",
+    "model": "tev1:0.8b"
+}
+
+### 8. Send Message - Plan Pricing Inquiry
+# @name sendPricingInquiry
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Quais são os planos e preços disponíveis para upgrade?"
+}
+
+### 9. Send Message - Financial Overview & Invoices Request
+# @name sendFinancialInquiry
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Gostaria de consultar minhas faturas e extrato financeiro."
+}
+
+### 10. Send Message - Guest Customer Providing Phone Authentication
+# @name sendGuestPhoneAuthentication
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Meu telefone cadastrado é {{CUSTOMER_REF}}"
+}
+
+### 11. Send Message - Guest Customer Providing CPF Authentication
+# @name sendGuestCpfAuthentication
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Meu CPF cadastrado é {{CUSTOMER_CPF}}"
+}
+
+### 12. Get Chat Session History
+# @name getChatHistory
+GET {{BASE_URL}}/api/chat/history?customerId={{CUSTOMER_REF}}
+Accept: application/json
+
+### 13. Reset Customer Chat Session Cache
+# @name resetChatSession
+POST {{BASE_URL}}/api/chat/reset
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}"
+}
