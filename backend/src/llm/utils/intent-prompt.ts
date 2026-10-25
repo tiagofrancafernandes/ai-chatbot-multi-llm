@@ -28,7 +28,7 @@ Intent Definitions:
 - "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano Starter", "contratar o plano pro", "assinar de 49.90").
 - "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado").
 - "simulate_signature": User wants to simulate digital signature ("simular assinatura", "simular contrato").
-- "plan_change": User wants to change, switch, upgrade, or downgrade plan (e.g., "mudar pro mais barato", "trocar pro Starter", "muda meu plano").
+- "plan_change": User wants to change, switch, upgrade, or downgrade plan (e.g., "mudar para o plano Professional", "trocar pro Starter", "mudar pro mais barato"). If user mentions a specific plan, targetPlan MUST be that plan ("Professional", "Starter", "Premium Business"), NOT "cheapest".
 - "cancellation": User wants to cancel subscription or contract (e.g., "quero cancelar", "cancela meu plano", "encerrar assinatura").
 - "address_change": User requests address update (e.g., "mudei de casa", "trocar meu endereço pra Rua X 123", "novo endereço").
 - "technical_support": Connection outages, slow speed, blinking red router lights, system errors, "caiu a net", "modem piscando".

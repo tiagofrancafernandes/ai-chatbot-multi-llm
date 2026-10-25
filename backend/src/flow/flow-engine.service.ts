@@ -1248,45 +1248,23 @@ export class FlowEngineService {
         plans: Array<{ id: string; name: string; price: number; features: string[] }>,
         lowerText = ''
     ): StepRoutingOutcome {
-        // Sort plans by price ascending
-        const sortedPlans = [...plans].sort((a, b) => a.price - b.price);
-        const cheapestPlan = sortedPlans[0];
+        // 1. Identify specific target plan first (e.g. Professional, Premium Business, Starter)
+        let targetPlanName: string | null =
+            analysis.targetPlan && analysis.targetPlan !== 'cheapest' ? analysis.targetPlan : null;
 
-        const wantsCheapest =
-            analysis.targetPlan === 'cheapest' ||
-            lowerText.includes('barato') ||
-            lowerText.includes('em conta') ||
-            lowerText.includes('menor valor') ||
-            analysis.actionDetail?.toLowerCase().includes('barato');
-
-        if (wantsCheapest) {
-            if (customer.plan === cheapestPlan.name) {
-                const response = `Você já possui o nosso plano mais econômico, o **"${customer.plan}"** (R$ ${cheapestPlan.price.toFixed(2)}/mês).\n\nDeseja verificar os recursos inclusos ou falar com um atendente para condições personalizadas?`;
-                const options = ['Ver benefícios do meu plano', 'Falar com atendente', 'Menu principal'];
-
-                return { response, nodeId: 'node_plan_pricing_action', options };
+        if (!targetPlanName) {
+            if (lowerText.includes('pro') || lowerText.includes('professional')) {
+                targetPlanName = 'Professional';
             }
-
-            session.pendingAction = {
-                type: 'plan_change',
-                targetPlan: cheapestPlan.name,
-                previousValue: customer.plan,
-                description: `Mudança do plano ${customer.plan} para o mais barato (${cheapestPlan.name})`,
-                createdAt: Date.now(),
-            };
-
-            const response = `Identifiquei que você deseja alterar seu plano atual (**"${customer.plan || 'Plano Atual'}"**) para o plano mais econômico:\n\n⭐ **${cheapestPlan.name}** — R$ ${cheapestPlan.price.toFixed(2)}/mês (${cheapestPlan.features.join(', ')})\n\n⚠️ **Confirmação necessária:** Esta alteração modificará os recursos e o valor da sua fatura mensal.\n\nVocê confirma a alteração do seu plano para o **${cheapestPlan.name}**?`;
-            const options = ['Sim, confirmo a mudança', 'Não, manter meu plano atual', 'Ver outros planos disponíveis'];
-
-            return { response, nodeId: 'node_plan_change_action', options };
+            if (lowerText.includes('premium') || lowerText.includes('business')) {
+                targetPlanName = 'Premium Business';
+            }
+            if (lowerText.includes('starter') && !lowerText.includes('barato')) {
+                targetPlanName = 'Starter';
+            }
         }
 
-        // User named a specific target plan (only if present in user text)
-        const matchedTarget = plans.find(
-            (p) =>
-                p.name.toLowerCase() === (analysis.targetPlan || '').toLowerCase() &&
-                lowerText.includes(p.name.toLowerCase())
-        );
+        const matchedTarget = plans.find((p) => p.name.toLowerCase() === (targetPlanName || '').toLowerCase());
 
         if (matchedTarget) {
             if (customer.plan === matchedTarget.name) {
@@ -1306,6 +1284,38 @@ export class FlowEngineService {
 
             const response = `Identifiquei a solicitação de migração para o plano:\n\n⭐ **${matchedTarget.name}** — R$ ${matchedTarget.price.toFixed(2)}/mês (${matchedTarget.features.join(', ')})\n\n⚠️ **Confirmação necessária:** Esta alteração atualizará suas condições contratuais.\n\nVocê confirma a alteração do seu plano para o **${matchedTarget.name}**?`;
             const options = ['Sim, confirmo a mudança', 'Não, cancelar alteração', 'Ver outros planos'];
+
+            return { response, nodeId: 'node_plan_change_action', options };
+        }
+
+        // 2. User asked for the cheapest plan
+        const sortedPlans = [...plans].sort((a, b) => a.price - b.price);
+        const cheapestPlan = sortedPlans[0];
+
+        const wantsCheapest =
+            analysis.targetPlan === 'cheapest' ||
+            lowerText.includes('barato') ||
+            lowerText.includes('em conta') ||
+            lowerText.includes('menor valor');
+
+        if (wantsCheapest) {
+            if (customer.plan === cheapestPlan.name) {
+                const response = `Você já possui o nosso plano mais econômico, o **"${customer.plan}"** (R$ ${cheapestPlan.price.toFixed(2)}/mês).\n\nDeseja verificar os recursos inclusos ou falar com um atendente para condições personalizadas?`;
+                const options = ['Ver benefícios do meu plano', 'Falar com atendente', 'Menu principal'];
+
+                return { response, nodeId: 'node_plan_pricing_action', options };
+            }
+
+            session.pendingAction = {
+                type: 'plan_change',
+                targetPlan: cheapestPlan.name,
+                previousValue: customer.plan,
+                description: `Mudança do plano ${customer.plan} para o mais barato (${cheapestPlan.name})`,
+                createdAt: Date.now(),
+            };
+
+            const response = `Identifiquei que você deseja alterar seu plano atual (**"${customer.plan || 'Plano Atual'}"**) para o plano mais econômico:\n\n⭐ **${cheapestPlan.name}** — R$ ${cheapestPlan.price.toFixed(2)}/mês (${cheapestPlan.features.join(', ')})\n\n⚠️ **Confirmação necessária:** Esta alteração modificará os recursos e o valor da sua fatura mensal.\n\nVocê confirma a alteração do seu plano para o **${cheapestPlan.name}**?`;
+            const options = ['Sim, confirmo a mudança', 'Não, manter meu plano atual', 'Ver outros planos disponíveis'];
 
             return { response, nodeId: 'node_plan_change_action', options };
         }
