@@ -1,2 +1,4 @@
 *.http
 !*.example.http
+.env
+!.env.example

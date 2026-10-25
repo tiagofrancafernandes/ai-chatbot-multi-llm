@@ -60,3 +60,4 @@ Accept: application/json
 # @name getBusinessHours
 GET {{BASE_URL}}/api/business-hours
 Accept: application/json
+

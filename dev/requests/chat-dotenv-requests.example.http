@@ -1,0 +1,89 @@
+################################################################################
+# VS Code REST Client - Dotenv Environment Variables Example
+#
+# Documentation reference:
+# {{$dotenv [%]variableName}}: Returns the environment value stored in the .env file
+# which exists in the same directory of your .http file.
+# Note: Use % before variableName (e.g. {{$dotenv %MY_VAR}}) to URL-encode the value.
+#
+# Setup:
+# Copy `dev/requests/.env.example` to `dev/requests/.env` before executing.
+################################################################################
+
+######### [VARS VIA $dotenv] #################################
+@BASE_URL={{$dotenv BASE_URL}}
+@CUSTOMER_REF={{$dotenv CUSTOMER_REF}}
+@CUSTOMER_CPF={{$dotenv CUSTOMER_CPF}}
+@AUTH_TOKEN={{$dotenv AUTH_TOKEN}}
+@PROVIDER_ID={{$dotenv DEFAULT_PROVIDER}}
+@MODEL_NAME={{$dotenv DEFAULT_MODEL}}
+######### [END VARS] #################################
+
+### 1. List Active Providers (Reading BASE_URL from .env)
+# @name listProvidersDotenv
+GET {{$dotenv BASE_URL}}/api/chat/providers
+Accept: application/json
+
+### 2. Switch Active Provider (Reading Provider & Model from .env)
+# @name switchProviderDotenv
+POST {{$dotenv BASE_URL}}/api/chat/providers/switch
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "providerId": "{{$dotenv DEFAULT_PROVIDER}}",
+    "model": "{{$dotenv DEFAULT_MODEL}}"
+}
+
+### 3. Initialize Chat Session (Reading Customer Reference from .env)
+# @name initChatDotenv
+POST {{BASE_URL}}/api/chat/init
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{$dotenv CUSTOMER_REF}}"
+}
+
+### 4. Send Triage Message (Complex Intent + Secondary Invoice Request)
+# @name sendMessageDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "O sistema caiu de novo. Aproveitando, vocês podem me mandar a segunda via da fatura deste mês?",
+    "providerId": "{{PROVIDER_ID}}",
+    "model": "{{MODEL_NAME}}"
+}
+
+### 5. Get Customer Profile by Identifier using URL-encoded Dotenv Variable ({{$dotenv %CUSTOMER_REF}})
+# @name getCustomerByPhoneDotenv
+GET {{BASE_URL}}/api/customers/{{$dotenv %CUSTOMER_REF}}
+Accept: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+### 6. Get Customer Profile by CPF with special characters (URL encoded via % prefix)
+# @name getCustomerByCpfDotenv
+GET {{BASE_URL}}/api/customers/{{$dotenv %CUSTOMER_CPF}}
+Accept: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+### 7. Get Chat History Query using URL-encoded parameter
+# @name getHistoryDotenv
+GET {{BASE_URL}}/api/chat/history?customerId={{$dotenv %CUSTOMER_REF}}
+Accept: application/json
+
+### 8. Reset Chat Session Cache
+# @name resetSessionDotenv
+POST {{BASE_URL}}/api/chat/reset
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}"
+}
