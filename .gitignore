@@ -48,6 +48,17 @@ yarn.lock
 .env.*.local
 !.env.example
 
+# Security & Credentials
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+id_rsa*
+*.id_rsa*
+
+
 # Local JSON database storage
 *.db.json
 db.json
