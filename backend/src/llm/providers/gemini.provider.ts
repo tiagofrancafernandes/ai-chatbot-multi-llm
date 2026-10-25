@@ -21,8 +21,8 @@ export class GeminiProvider implements LlmProvider {
 
     constructor(private readonly configService: ConfigService) {
         this.apiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
-        this.defaultModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
-        this.availableModels = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+        this.defaultModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.5-flash-lite';
+        this.availableModels = ['gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'];
     }
 
     public isConfigured(): boolean {

@@ -152,3 +152,4 @@ All code in this project follows `UNIVERSAL-CODE-STYLE-RULES.md`:
 - Fail-fast input validation.
 - Descriptive naming and boolean variables framed as questions.
 - 100% English code, comments, and API payloads.
+

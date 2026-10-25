@@ -15,7 +15,7 @@ services:
             - OLLAMA_DECISION_MODEL=${OLLAMA_DECISION_MODEL:-tev1:0.8b}
             - OLLAMA_CHAT_MODEL=${OLLAMA_CHAT_MODEL:-llama3.2:1b}
             - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-            - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+            - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
             - OPENAI_API_KEY=${OPENAI_API_KEY:-}
             - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
             - LMSTUDIO_HOST=${LMSTUDIO_HOST:-http://host.docker.internal:1234/v1}

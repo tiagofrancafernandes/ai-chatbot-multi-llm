@@ -98,9 +98,19 @@ export class LlmService {
     }
 
     public listProviders(): ProviderInfo[] {
+        const configuredEnabled = this.configService.get<string>('ENABLED_PROVIDERS') || 'ollama,gemini';
+        const enabledList = configuredEnabled
+            .split(',')
+            .map((item) => item.trim().toLowerCase())
+            .filter(Boolean);
+
         const list: ProviderInfo[] = [];
 
         this.providers.forEach((provider) => {
+            if (enabledList.length > 0 && !enabledList.includes(provider.providerId)) {
+                return;
+            }
+
             list.push({
                 id: provider.providerId,
                 displayName: provider.displayName,
