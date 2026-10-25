@@ -7,7 +7,7 @@ import { Customer, ChatMessage, ProviderInfo } from '../types/chat';
 const STORAGE_KEY = 'chat_customer_id';
 
 const messages = ref<ChatMessage[]>([]);
-const inputRef = ref<HTMLInputElement>();
+const inputRef = ref<HTMLInputElement | null>(null);
 const customer = ref<Customer | null>(null);
 const currentCustomerId = ref<string>('');
 const inputText = ref<string>('');
@@ -34,17 +34,17 @@ const quickSuggestions = [
 ];
 
 onMounted(async () => {
+    await focusMessageInput();
     await loadProviders();
     await initSession();
+    await focusMessageInput();
 });
 
-function focusMessageInput() {
-    setTimeout(() => {
-        inputRef.value?.focus();
-        if (inputRef.value) {
-            inputRef.value?.focus();
-        }
-    }, 300);
+async function focusMessageInput(): Promise<void> {
+    await nextTick();
+    if (inputRef.value) {
+        inputRef.value.focus();
+    }
 }
 
 async function loadProviders(): Promise<void> {
@@ -77,13 +77,13 @@ async function initSession(): Promise<void> {
         activeNodeId.value = result.session.activeNodeId;
         currentIntent.value = result.session.currentIntent || 'greeting';
 
-        focusMessageInput();
+        await focusMessageInput();
         await scrollToBottom();
     } catch (error) {
         toast.error(`Session error: ${(error as Error).message}`);
     } finally {
         isLoading.value = false;
-        focusMessageInput();
+        await focusMessageInput();
     }
 }
 
@@ -91,14 +91,17 @@ async function handleSendMessage(customText?: string): Promise<void> {
     const textToSend = (customText || inputText.value).trim();
 
     if (!textToSend) {
+        await focusMessageInput();
         return;
     }
 
     if (isLoading.value) {
+        await focusMessageInput();
         return;
     }
 
     inputText.value = '';
+    await focusMessageInput();
 
     const tempUserMsg: ChatMessage = {
         id: `temp_${Date.now()}`,
@@ -141,7 +144,7 @@ async function handleSendMessage(customText?: string): Promise<void> {
         toast.error(`Failed to deliver message: ${(error as Error).message}`);
     } finally {
         isLoading.value = false;
-        focusMessageInput();
+        await focusMessageInput();
     }
 }
 
@@ -180,7 +183,7 @@ async function scrollToBottom(): Promise<void> {
     }
 
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    focusMessageInput();
+    await focusMessageInput();
 }
 </script>
 
@@ -334,8 +337,8 @@ async function scrollToBottom(): Promise<void> {
                     v-model="inputText"
                     ref="inputRef"
                     type="text"
+                    autofocus
                     placeholder="Type your message, phone number, or ask about plans..."
-                    :disabled="isLoading"
                     class="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition"
                 />
 
