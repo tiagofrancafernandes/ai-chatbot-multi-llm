@@ -1,16 +1,20 @@
 {
     "name": "ai-chatbot-multi-llm",
     "version": "1.0.0",
-    "description": "",
-    "main": "index.js",
+    "description": "Multi-LLM Chatbot with NestJS backend, Vue 3 frontend and Intent Flow Engine",
+    "private": true,
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "dev": "pnpm --parallel --filter backend --filter frontend dev",
+        "dev:backend": "pnpm --filter backend start:dev",
+        "dev:frontend": "pnpm --filter frontend dev",
+        "build": "pnpm --recursive run build",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
     },
     "keywords": [],
-    "author": "",
-    "license": "ISC",
+    "author": "Tiago França",
+    "license": "MIT",
     "devDependencies": {
-        "prettier": "^3.9.10",
-        "vite": "^8.3.5"
+        "prettier": "^3.9.10"
     }
 }
