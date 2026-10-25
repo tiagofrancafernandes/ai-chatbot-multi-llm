@@ -17,7 +17,13 @@ export interface FlowNode {
     name: string;
     type: FlowNodeType;
     description: string;
-    actionType?: 'check_customer_id' | 'fetch_invoices' | 'fetch_plans' | 'fetch_business_hours' | 'ai_generate';
+    actionType?:
+        | 'check_customer_id'
+        | 'fetch_invoices'
+        | 'fetch_plans'
+        | 'fetch_business_hours'
+        | 'register_customer'
+        | 'ai_generate';
     responseTemplate?: string;
     transitions: FlowTransition[];
     metadata?: Record<string, unknown>;

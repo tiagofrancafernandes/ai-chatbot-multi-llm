@@ -167,24 +167,24 @@ Content-Type: {{contentType}}
     "text": "vocês vendem pão de queijo quentinho?"
 }
 
-### 19. Guest Flow - Step 1: Consult Plans to Subscribe
-# @name guestConsultPlans
+### 19. Guest Flow - Step 1: Start Registration Directly
+# @name guestRegistrationRequest
 POST {{baseUrl}}/chat/message
 Content-Type: {{contentType}}
 
 {
     "customerId": "guest_demo_client",
-    "text": "Quero ver os planos para assinar"
+    "text": "Quero me registrar"
 }
 
-### 20. Guest Flow - Step 2: Choose Plan Starter
-# @name guestChoosePlan
+### 20. Guest Flow - Step 2: Choose Plan Professional
+# @name guestChoosePlanPro
 POST {{baseUrl}}/chat/message
 Content-Type: {{contentType}}
 
 {
     "customerId": "guest_demo_client",
-    "text": "Quero assinar o plano Starter"
+    "text": "Quero o plano professional"
 }
 
 ### 21. Guest Flow - Step 3: Send Complete Registration Data

@@ -228,26 +228,26 @@ Authorization: Bearer {{AUTH_TOKEN}}
     "text": "vocês vendem pão de queijo quentinho?"
 }
 
-### 21. Guest Subscription Flow - Step 1: Consult Plans to Subscribe
-# @name guestConsultPlans
+### 21. Guest Registration Flow - Step 1: Start Registration Directly
+# @name guestRegistrationRequest
 POST {{BASE_URL}}/api/chat/message
 Accept: application/json
 Content-Type: application/json
 
 {
     "customerId": "{{GUEST_CUSTOMER_ID}}",
-    "text": "Quero ver os planos para assinar"
+    "text": "Quero me registrar"
 }
 
-### 22. Guest Subscription Flow - Step 2: Choose Plan Starter
-# @name guestChoosePlan
+### 22. Guest Registration Flow - Step 2: Choose Plan Professional
+# @name guestChoosePlanPro
 POST {{BASE_URL}}/api/chat/message
 Accept: application/json
 Content-Type: application/json
 
 {
     "customerId": "{{GUEST_CUSTOMER_ID}}",
-    "text": "Quero assinar o plano Starter"
+    "text": "Quero o plano professional"
 }
 
 ### 23. Guest Subscription Flow - Step 3: Send Complete Registration Data

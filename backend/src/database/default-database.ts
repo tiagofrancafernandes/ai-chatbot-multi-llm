@@ -100,6 +100,24 @@ export const INITIAL_DATABASE_DATA: DatabaseSchema = {
                 description: 'Analyzes user prompt with SystemOne or Structured LLM to infer intents',
                 transitions: [
                     {
+                        id: 'trans_to_registration',
+                        targetNodeId: 'node_customer_registration_action',
+                        condition: {
+                            type: 'intent_equals',
+                            value: 'customer_registration',
+                        },
+                        description: 'Route new prospective customers to registration and onboarding',
+                    },
+                    {
+                        id: 'trans_to_subscription',
+                        targetNodeId: 'node_customer_registration_action',
+                        condition: {
+                            type: 'intent_equals',
+                            value: 'plan_subscription',
+                        },
+                        description: 'Route plan subscription requests to registration and contract flow',
+                    },
+                    {
                         id: 'trans_to_auth',
                         targetNodeId: 'node_customer_auth_action',
                         condition: {
@@ -162,6 +180,32 @@ export const INITIAL_DATABASE_DATA: DatabaseSchema = {
                 transitions: [
                     {
                         id: 'trans_auth_default',
+                        targetNodeId: 'node_fallback_message',
+                        condition: {
+                            type: 'default',
+                        },
+                    },
+                ],
+            },
+            {
+                id: 'node_customer_registration_action',
+                name: 'Customer Registration Action',
+                type: 'action',
+                description:
+                    'Collects customer registration details (name, CPF, email, phone, address) and creates digital subscription contract',
+                actionType: 'register_customer',
+                transitions: [
+                    {
+                        id: 'trans_reg_to_pricing',
+                        targetNodeId: 'node_plan_pricing_action',
+                        condition: {
+                            type: 'intent_equals',
+                            value: 'plan_pricing',
+                        },
+                        description: 'Allow customer to view pricing while registering',
+                    },
+                    {
+                        id: 'trans_reg_default',
                         targetNodeId: 'node_fallback_message',
                         condition: {
                             type: 'default',

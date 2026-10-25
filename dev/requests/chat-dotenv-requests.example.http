@@ -148,26 +148,26 @@ Authorization: Bearer {{$dotenv AUTH_TOKEN}}
     "text": "vocês vendem pão de queijo quentinho?"
 }
 
-### 14. Guest Subscription - Consult Available Plans
-# @name guestConsultPlansDotenv
+### 14. Guest Registration - Direct Registration Initiation
+# @name guestRegistrationRequestDotenv
 POST {{BASE_URL}}/api/chat/message
 Accept: application/json
 Content-Type: application/json
 
 {
     "customerId": "guest_dotenv_test",
-    "text": "Quero ver os planos para assinar"
+    "text": "Quero me registrar"
 }
 
-### 15. Guest Subscription - Choose Plan Starter
-# @name guestChoosePlanDotenv
+### 15. Guest Registration - Choose Plan Professional
+# @name guestChoosePlanProDotenv
 POST {{BASE_URL}}/api/chat/message
 Accept: application/json
 Content-Type: application/json
 
 {
     "customerId": "guest_dotenv_test",
-    "text": "Quero assinar o plano Starter"
+    "text": "Quero o plano professional"
 }
 
 ### 16. Guest Subscription - Send Complete Registration Data

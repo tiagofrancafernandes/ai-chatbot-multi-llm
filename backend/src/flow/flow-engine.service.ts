@@ -154,7 +154,32 @@ export class FlowEngineService {
             return null;
         }
 
-        const isCancel = this.isNegativeConfirmation(text, analysis);
+        const currentData = pending.registrationData || {};
+        const lowerText = text.toLowerCase();
+
+        if (lowerText.includes('pro') || lowerText.includes('professional')) {
+            pending.targetPlan = 'Professional';
+        }
+
+        if (lowerText.includes('premium') || lowerText.includes('business')) {
+            pending.targetPlan = 'Premium Business';
+        }
+
+        if (lowerText.includes('starter') || lowerText.includes('barato')) {
+            pending.targetPlan = 'Starter';
+        }
+
+        const updatedData = this.extractRegistrationFields(text, currentData);
+        pending.registrationData = updatedData;
+
+        const hasAnyRegistrationField =
+            Boolean(updatedData.name && updatedData.name !== currentData.name) ||
+            Boolean(updatedData.cpf && updatedData.cpf !== currentData.cpf) ||
+            Boolean(updatedData.email && updatedData.email !== currentData.email) ||
+            Boolean(updatedData.phone && updatedData.phone !== currentData.phone) ||
+            Boolean(updatedData.address && updatedData.address !== currentData.address);
+
+        const isCancel = !hasAnyRegistrationField && this.isNegativeConfirmation(text, analysis);
 
         if (isCancel) {
             session.pendingAction = null;
@@ -167,10 +192,6 @@ export class FlowEngineService {
                 updatedCustomer: customer,
             };
         }
-
-        const currentData = pending.registrationData || {};
-        const updatedData = this.extractRegistrationFields(text, currentData);
-        pending.registrationData = updatedData;
 
         const missing = this.getMissingRegistrationFields(updatedData);
 
@@ -205,7 +226,7 @@ export class FlowEngineService {
 
             return {
                 response,
-                nodeId: 'node_registration_data_collection',
+                nodeId: 'node_customer_registration_action',
                 options,
                 updatedCustomer: customer,
             };
@@ -725,8 +746,213 @@ export class FlowEngineService {
         session: ChatSession,
         flow: FlowDefinition
     ): { isHandled: boolean; response: string; nodeId: string; updatedCustomer: Customer; options?: string[] } {
+        const lowerText = text.toLowerCase();
         const candidateIdentifier = analysis.extractedIdentifier || this.extractPhoneOrCpf(text);
 
+        const isRegistration =
+            analysis.primaryIntent === 'customer_registration' ||
+            lowerText.includes('registrar') ||
+            lowerText.includes('registro') ||
+            lowerText.includes('cadastrar') ||
+            lowerText.includes('cadastro') ||
+            lowerText.includes('criar conta') ||
+            lowerText.includes('abrir conta') ||
+            lowerText.includes('novo cliente') ||
+            lowerText.includes('novo cadastro');
+
+        const isSubscription =
+            analysis.primaryIntent === 'plan_subscription' ||
+            lowerText.includes('assinar') ||
+            lowerText.includes('contratar') ||
+            lowerText.includes('quero o plano') ||
+            lowerText.includes('vou querer o plano') ||
+            lowerText.includes('escolho o plano') ||
+            lowerText.includes('plano starter') ||
+            lowerText.includes('plano pro') ||
+            lowerText.includes('plano professional') ||
+            lowerText.includes('plano premium') ||
+            lowerText.includes('plano business');
+
+        const registrationNode = this.findNode(flow, 'node_customer_registration_action');
+        const regNodeId = registrationNode?.id || 'node_customer_registration_action';
+
+        // 1. Explicit Customer Registration Flow
+        if (isRegistration && !lowerText.includes('mudar') && !lowerText.includes('trocar')) {
+            const plans = this.databaseService.getPlans();
+            let chosenPlan = plans[0]; // Starter default
+
+            if (lowerText.includes('pro') || lowerText.includes('professional')) {
+                const found = plans.find((p) => p.name === 'Professional');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            if (lowerText.includes('premium') || lowerText.includes('business')) {
+                const found = plans.find((p) => p.name === 'Premium Business');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            const initialData = this.extractRegistrationFields(text, {});
+            session.pendingAction = {
+                type: 'new_subscription',
+                targetPlan: chosenPlan.name,
+                registrationData: initialData,
+                description: `Cadastro de cliente e contratação do plano ${chosenPlan.name}`,
+                createdAt: Date.now(),
+            };
+
+            const missing = this.getMissingRegistrationFields(initialData);
+
+            if (missing.length < 5) {
+                const outcome = this.handleNewSubscriptionData(text, analysis, session, currentCustomer);
+
+                if (outcome) {
+                    return {
+                        isHandled: true,
+                        response: outcome.response,
+                        nodeId: outcome.nodeId,
+                        updatedCustomer: outcome.updatedCustomer || currentCustomer,
+                        options: outcome.options,
+                    };
+                }
+            }
+
+            const planLines = plans.map(
+                (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
+            );
+
+            const response =
+                `Seja muito bem-vindo! Ficamos felizes com seu interesse em se tornar nosso cliente.\n\n` +
+                `Aqui estão nossos planos de assinatura disponíveis:\n\n${planLines.join('\n')}\n\n` +
+                `Qual destes planos você gostaria de contratar para iniciarmos seu cadastro?\n\n` +
+                `*(Se preferir, você também já pode nos enviar seus dados: Nome completo, CPF, E-mail, Telefone com DDD e Endereço completo de instalação!)*`;
+
+            const options = ['Quero o plano Starter', 'Quero o plano Professional', 'Quero o plano Premium Business'];
+
+            return {
+                isHandled: true,
+                response,
+                nodeId: regNodeId,
+                updatedCustomer: currentCustomer,
+                options,
+            };
+        }
+
+        // 2. Plan Subscription Flow
+        if (isSubscription && !lowerText.includes('mudar') && !lowerText.includes('trocar')) {
+            const plans = this.databaseService.getPlans();
+            const hasSpecificPlan =
+                lowerText.includes('pro') ||
+                lowerText.includes('professional') ||
+                lowerText.includes('premium') ||
+                lowerText.includes('business') ||
+                lowerText.includes('starter') ||
+                lowerText.includes('barato') ||
+                lowerText.includes('49') ||
+                lowerText.includes('99') ||
+                lowerText.includes('150');
+
+            if (!hasSpecificPlan) {
+                const planLines = plans.map(
+                    (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
+                );
+
+                const response =
+                    `Excelente! Ficamos felizes com seu interesse em assinar nossos serviços.\n\n` +
+                    `Aqui estão nossos planos disponíveis para contratação:\n\n${planLines.join('\n')}\n\n` +
+                    `Qual destes planos você gostaria de contratar para iniciarmos seu cadastro?`;
+
+                const options = [
+                    'Quero o plano Starter',
+                    'Quero o plano Professional',
+                    'Quero o plano Premium Business',
+                ];
+
+                session.pendingAction = {
+                    type: 'new_subscription',
+                    targetPlan: 'Starter',
+                    registrationData: {},
+                    description: 'Contratação de assinatura',
+                    createdAt: Date.now(),
+                };
+
+                return {
+                    isHandled: true,
+                    response,
+                    nodeId: regNodeId,
+                    updatedCustomer: currentCustomer,
+                    options,
+                };
+            }
+
+            let chosenPlan = plans[0]; // Starter default
+
+            if (lowerText.includes('pro') || lowerText.includes('professional')) {
+                const found = plans.find((p) => p.name === 'Professional');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            if (lowerText.includes('premium') || lowerText.includes('business')) {
+                const found = plans.find((p) => p.name === 'Premium Business');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            if (lowerText.includes('starter') || lowerText.includes('barato') || lowerText.includes('49')) {
+                const found = plans.find((p) => p.name === 'Starter');
+                if (found) {
+                    chosenPlan = found;
+                }
+            }
+
+            session.pendingAction = {
+                type: 'new_subscription',
+                targetPlan: chosenPlan.name,
+                registrationData: this.extractRegistrationFields(text, {}),
+                description: `Contratação do plano ${chosenPlan.name}`,
+                createdAt: Date.now(),
+            };
+
+            const missing = this.getMissingRegistrationFields(session.pendingAction.registrationData || {});
+
+            if (missing.length < 5) {
+                const outcome = this.handleNewSubscriptionData(text, analysis, session, currentCustomer);
+
+                if (outcome) {
+                    return {
+                        isHandled: true,
+                        response: outcome.response,
+                        nodeId: outcome.nodeId,
+                        updatedCustomer: outcome.updatedCustomer || currentCustomer,
+                        options: outcome.options,
+                    };
+                }
+            }
+
+            const response = `Excelente escolha! O plano **${chosenPlan.name}** (**R$ ${chosenPlan.price.toFixed(2)}/mês**) oferece ${chosenPlan.features.join(', ')}.\n\nPara gerarmos seu contrato digital e ativarmos sua conexão, precisamos dos seus dados cadastrais:\n• **Nome completo**\n• **CPF**\n• **E-mail**\n• **Telefone com DDD**\n• **Endereço completo de instalação**\n\n*(Você pode nos enviar todos os dados juntos em uma única mensagem ou aos poucos, como preferir!)*`;
+
+            const options = [
+                'Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120',
+                'Ver outros planos',
+                'Cancelar contratação',
+            ];
+
+            return {
+                isHandled: true,
+                response,
+                nodeId: regNodeId,
+                updatedCustomer: currentCustomer,
+                options,
+            };
+        }
+
+        // 3. Existing Customer Candidate Identifier Authentication
         if (candidateIdentifier) {
             const matchedCustomer = this.databaseService.findCustomerByIdentifier(candidateIdentifier);
 
@@ -753,8 +979,8 @@ export class FlowEngineService {
                 };
             }
 
-            const response = `Não localizamos nenhum cadastro com "${candidateIdentifier}". Você pode consultar nossos planos públicos ou falar com um atendente.`;
-            const options = ['Ver planos públicos', 'Tentar outro telefone ou CPF', 'Falar com atendente'];
+            const response = `Não localizamos nenhum cadastro com "${candidateIdentifier}".\n\nSe você ainda não é cliente, você pode iniciar um novo cadastro para assinar nossos planos!`;
+            const options = ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
 
             return {
                 isHandled: true,
@@ -765,65 +991,7 @@ export class FlowEngineService {
             };
         }
 
-        const isSubscription =
-            analysis.primaryIntent === 'plan_subscription' ||
-            text.toLowerCase().includes('assinar') ||
-            text.toLowerCase().includes('contratar') ||
-            text.toLowerCase().includes('quero o plano') ||
-            text.toLowerCase().includes('vou querer o plano');
-
-        if (isSubscription && !text.toLowerCase().includes('mudar') && !text.toLowerCase().includes('trocar')) {
-            const plans = this.databaseService.getPlans();
-            let chosenPlan = plans[0]; // Starter
-
-            const lower = text.toLowerCase();
-
-            if (lower.includes('pro') || lower.includes('professional')) {
-                const found = plans.find((p) => p.name === 'Professional');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
-
-            if (lower.includes('premium') || lower.includes('business')) {
-                const found = plans.find((p) => p.name === 'Premium Business');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
-
-            if (lower.includes('starter') || lower.includes('barato') || lower.includes('49')) {
-                const found = plans.find((p) => p.name === 'Starter');
-                if (found) {
-                    chosenPlan = found;
-                }
-            }
-
-            session.pendingAction = {
-                type: 'new_subscription',
-                targetPlan: chosenPlan.name,
-                registrationData: {},
-                description: `Contratação do plano ${chosenPlan.name}`,
-                createdAt: Date.now(),
-            };
-
-            const response = `Excelente escolha! O plano **${chosenPlan.name}** (**R$ ${chosenPlan.price.toFixed(2)}/mês**) oferece ${chosenPlan.features.join(', ')}.\n\nPara gerarmos seu contrato digital e ativarmos sua conexão, precisamos dos seus dados cadastrais:\n• **Nome completo**\n• **CPF**\n• **E-mail**\n• **Telefone com DDD**\n• **Endereço completo de instalação**\n\n*(Você pode nos enviar todos os dados juntos em uma única mensagem ou aos poucos, como preferir!)*`;
-
-            const options = [
-                'Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120',
-                'Ver outros planos',
-                'Cancelar contratação',
-            ];
-
-            return {
-                isHandled: true,
-                response,
-                nodeId: 'node_plan_subscription_start',
-                updatedCustomer: currentCustomer,
-                options,
-            };
-        }
-
+        // 4. Plan Pricing Inquiries
         if (analysis.primaryIntent === 'plan_pricing') {
             const pricingNode = this.findNode(flow, 'node_plan_pricing_action');
             const plans = this.databaseService.getPlans();
@@ -832,9 +1000,9 @@ export class FlowEngineService {
             );
             const response = `Aqui estão nossos planos de assinatura disponíveis:\n\n${planLines.join('\n')}\n\nQual plano você gostaria de assinar? Ou, se já for cliente, informe seu telefone ou CPF para acessar sua conta!`;
             const options = [
-                'Quero assinar o plano Starter',
-                'Quero assinar o plano Professional',
-                'Quero assinar o plano Premium Business',
+                'Quero o plano Starter',
+                'Quero o plano Professional',
+                'Quero o plano Premium Business',
                 'Já sou cliente (informar telefone)',
             ];
 
@@ -847,9 +1015,10 @@ export class FlowEngineService {
             };
         }
 
+        // 5. Greeting
         if (analysis.primaryIntent === 'greeting') {
-            const response = `Olá! Seja bem-vindo ao nosso atendimento inteligente.\n\nPara acessar seus dados e serviços com segurança, por favor informe seu número de telefone ou CPF cadastrado (ex: '5511999999999'). Ou consulte nossos planos para assinar!`;
-            const options = ['Ver planos disponíveis', 'Quero assinar um plano', 'Meu telefone é 5511999999999'];
+            const response = `Olá! Seja bem-vindo ao nosso atendimento inteligente.\n\nSe você já é cliente, informe seu número de telefone ou CPF cadastrado (ex: '5511999999999') para acessar sua conta.\nSe você deseja se cadastrar ou contratar um novo plano, escolha uma das opções abaixo:`;
+            const options = ['Quero me cadastrar', 'Ver planos disponíveis', 'Meu telefone é 5511999999999'];
 
             return {
                 isHandled: true,
@@ -860,8 +1029,9 @@ export class FlowEngineService {
             };
         }
 
-        const response = `Olá! Para acessar sua conta e solicitar alterações, informe seu número de telefone ou CPF cadastrado (ex: '5511999999999').`;
-        const options = ['Meu telefone é 5511999999999', 'Ver planos disponíveis', 'Falar com atendente'];
+        // 6. Generic / Unknown Fallback for Guests
+        const response = `Olá! Não consegui identificar sua solicitação.\n\nSe você já é cliente, por favor informe seu telefone ou CPF cadastrado (ex: '5511999999999') para acessar sua conta.\nSe deseja se cadastrar ou contratar um novo plano, basta selecionar abaixo:`;
+        const options = ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
 
         return {
             isHandled: true,

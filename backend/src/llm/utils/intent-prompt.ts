@@ -11,7 +11,7 @@ Analyze the user text (including Brazilian slang, typos, abbreviations, and info
 
 Schema:
 {
-    "primaryIntent": "greeting" | "plan_pricing" | "plan_subscription" | "contract_signed" | "simulate_signature" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
+    "primaryIntent": "greeting" | "customer_registration" | "plan_pricing" | "plan_subscription" | "contract_signed" | "simulate_signature" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
     "secondaryRequest": "none" | "invoice_request" | "plan_upgrade",
     "actionDetail": string | null,
     "targetPlan": "cheapest" | "Starter" | "Professional" | "Premium Business" | null,
@@ -23,6 +23,7 @@ Schema:
 
 Intent Definitions:
 - "greeting": "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "hello".
+- "customer_registration": User (visitor/prospect) wants to register, sign up, create an account, or open customer profile (e.g. "quero me registrar", "criar conta", "fazer cadastro", "novo cliente", "cadastrar").
 - "plan_pricing": Inquiries about available plans, pricing, values, or asking "qual meu plano atual?".
 - "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano Starter", "contratar o plano pro", "assinar de 49.90").
 - "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado").
@@ -138,6 +139,44 @@ export function evaluateFallbackIntent(
         };
     }
 
+    // Customer Registration Intent (Visitor / Prospect)
+    const isRegistration =
+        text.includes('registrar') ||
+        text.includes('registro') ||
+        text.includes('cadastrar') ||
+        text.includes('cadastro') ||
+        text.includes('criar conta') ||
+        text.includes('abrir conta') ||
+        text.includes('novo cliente') ||
+        text.includes('novo cadastro');
+
+    if (isRegistration && !text.includes('mudar') && !text.includes('trocar')) {
+        let regTarget: string | undefined = undefined;
+
+        if (text.includes('pro') || text.includes('professional')) {
+            regTarget = 'Professional';
+        }
+
+        if (text.includes('premium') || text.includes('business')) {
+            regTarget = 'Premium Business';
+        }
+
+        if (text.includes('starter') || text.includes('barato')) {
+            regTarget = 'Starter';
+        }
+
+        return {
+            primaryIntent: 'customer_registration',
+            secondaryRequest: 'none',
+            isClientExplicit: true,
+            confidence: 0.95,
+            targetPlan: regTarget,
+            providerUsed: providerName,
+            modelUsed: 'heuristic-rule-engine',
+            actionDetail: 'customer_registration',
+        };
+    }
+
     // Plan Subscription Intent (Visitor / Prospect)
     const isPlanSubscription =
         text.includes('assinar') ||
@@ -147,10 +186,14 @@ export function evaluateFallbackIntent(
         text.includes('escolho o plano') ||
         text.includes('quero o plano') ||
         text.includes('vou querer o plano') ||
-        text.includes('assinar plano');
+        text.includes('assinar plano') ||
+        text.includes('plano starter') ||
+        text.includes('plano pro') ||
+        text.includes('plano professional') ||
+        text.includes('plano premium');
 
     if (isPlanSubscription && !text.includes('mudar') && !text.includes('trocar')) {
-        let subTarget = 'Starter';
+        let subTarget: string | undefined = undefined;
 
         if (text.includes('pro') || text.includes('professional')) {
             subTarget = 'Professional';

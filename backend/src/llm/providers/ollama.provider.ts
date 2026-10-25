@@ -92,7 +92,20 @@ export class OllamaProvider implements LlmProvider {
             lower.includes('cancela') ||
             lower.includes('endereço') ||
             lower.includes('endereco') ||
-            lower.includes('mudei')
+            lower.includes('mudei') ||
+            lower.includes('registr') ||
+            lower.includes('cadastr') ||
+            lower.includes('criar conta') ||
+            lower.includes('novo cliente') ||
+            lower.includes('novo cadastro') ||
+            lower.includes('assinar') ||
+            lower.includes('contratar') ||
+            lower.includes('assinei') ||
+            lower.includes('simular') ||
+            lower.includes('quero o plano') ||
+            lower.includes('plano starter') ||
+            lower.includes('plano pro') ||
+            lower.includes('plano premium')
         );
     }
 
@@ -106,6 +119,9 @@ export class OllamaProvider implements LlmProvider {
                     instructions: 'What is the primary intent of the user?',
                     criteria: {
                         greeting: 'Greetings or salutations like hi, hello, bom dia',
+                        customer_registration:
+                            'User wants to register, sign up, create an account, or open customer profile',
+                        plan_subscription: 'User wants to hire, subscribe to, or choose a specific plan',
                         plan_pricing: 'Inquiries about plan prices, tiers, costs or features',
                         technical_support: 'Technical problems, system outages, errors or downtime',
                         financial: 'Invoices, bills, bank slips, pending statements or payment requests',

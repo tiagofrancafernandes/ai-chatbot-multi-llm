@@ -359,6 +359,36 @@ export class JsonDatabaseService implements OnModuleInit {
             if (this.cache && !this.cache.contracts) {
                 this.cache.contracts = [];
             }
+
+            if (this.cache?.flow?.nodes) {
+                const hasRegistrationNode = this.cache.flow.nodes.some(
+                    (node) => node.id === 'node_customer_registration_action'
+                );
+
+                if (!hasRegistrationNode) {
+                    const registrationNode = INITIAL_DATABASE_DATA.flow.nodes.find(
+                        (node) => node.id === 'node_customer_registration_action'
+                    );
+
+                    if (registrationNode) {
+                        this.cache.flow.nodes.push(registrationNode);
+                    }
+
+                    const decisionNode = this.cache.flow.nodes.find((node) => node.id === 'node_intent_decision');
+
+                    if (decisionNode) {
+                        const initDecisionNode = INITIAL_DATABASE_DATA.flow.nodes.find(
+                            (node) => node.id === 'node_intent_decision'
+                        );
+
+                        if (initDecisionNode) {
+                            decisionNode.transitions = initDecisionNode.transitions;
+                        }
+                    }
+
+                    this.saveDatabase(this.cache);
+                }
+            }
         } catch (error) {
             this.logger.error(`Error reading database file: ${(error as Error).message}. Resetting to initial data.`);
             this.cache = INITIAL_DATABASE_DATA;
