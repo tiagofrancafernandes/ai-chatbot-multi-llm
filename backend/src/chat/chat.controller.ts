@@ -3,6 +3,9 @@ import { ChatService } from './chat.service';
 import { InitChatDto } from './dto/init-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SwitchProviderDto } from './dto/switch-provider.dto';
+import { TransferAttendanceDto } from './dto/transfer-attendance.dto';
+import { AgentMessageDto } from './dto/agent-message.dto';
+import { ResumeAiDto } from './dto/resume-ai.dto';
 
 @Controller('api/chat')
 export class ChatController {
@@ -46,6 +49,29 @@ export class ChatController {
     @HttpCode(HttpStatus.OK)
     public signContract(@Param('contractId') contractId: string) {
         return this.chatService.signContract(contractId);
+    }
+
+    @Post('transfer')
+    @HttpCode(HttpStatus.OK)
+    public transferAttendance(@Body() dto: TransferAttendanceDto) {
+        return this.chatService.transferAttendance(dto);
+    }
+
+    @Post('agent-message')
+    @HttpCode(HttpStatus.OK)
+    public sendAgentMessage(@Body() dto: AgentMessageDto) {
+        return this.chatService.sendAgentMessage(dto);
+    }
+
+    @Post('resume-ai')
+    @HttpCode(HttpStatus.OK)
+    public resumeAiAttendance(@Body() dto: ResumeAiDto) {
+        return this.chatService.resumeAiAttendance(dto);
+    }
+
+    @Get('agents')
+    public getAgents() {
+        return this.chatService.getAttendanceDeskInfo();
     }
 
     @Get('contract/:contractId')

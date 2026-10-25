@@ -185,4 +185,82 @@ export class ApiService {
 
         return response.json();
     }
+
+    public static async getAttendanceDeskInfo(): Promise<{
+        departments: Array<{
+            id: string;
+            name: string;
+            description: string;
+            availableAgentsCount: number;
+            estimatedWaitSeconds: number;
+        }>;
+        agents: Array<{
+            id: string;
+            name: string;
+            department: string;
+            departmentName: string;
+            isOnline: boolean;
+            avatar?: string;
+        }>;
+    }> {
+        const response = await fetch(`${API_BASE}/chat/agents`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load attendance desk info (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async transferAttendance(
+        customerId: string,
+        departmentId?: string,
+        agentId?: string,
+        timeoutSeconds?: number
+    ): Promise<{ session: ChatSession; message: string }> {
+        const response = await fetch(`${API_BASE}/chat/transfer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId, departmentId, agentId, timeoutSeconds }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to transfer attendance (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async sendAgentMessage(
+        customerId: string,
+        text: string,
+        agentName?: string,
+        agentId?: string
+    ): Promise<{ session: ChatSession; message: unknown }> {
+        const response = await fetch(`${API_BASE}/chat/agent-message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId, text, agentName, agentId }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to send agent message (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async resumeAiAttendance(customerId: string): Promise<{ session: ChatSession; message: string }> {
+        const response = await fetch(`${API_BASE}/chat/resume-ai`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to resume AI attendance (${response.status})`);
+        }
+
+        return response.json();
+    }
 }

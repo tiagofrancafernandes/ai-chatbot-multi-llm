@@ -1,4 +1,5 @@
 import { CustomerRegistrationData } from './contract.interface';
+import { AttendanceInfo } from './attendance.interface';
 
 export interface PendingAction {
     type: 'plan_change' | 'cancellation' | 'address_change' | 'new_subscription' | 'contract_signing';
@@ -14,7 +15,8 @@ export interface PendingAction {
 
 export interface ChatMessage {
     id: string;
-    sender: 'user' | 'bot' | 'system';
+    sender: 'user' | 'bot' | 'system' | 'agent';
+    agentName?: string;
     text: string;
     timestamp: number;
     nodeId?: string;
@@ -34,6 +36,7 @@ export interface ChatSession {
     currentIntent?: string;
     secondaryRequest?: string;
     pendingAction?: PendingAction | null;
+    attendance?: AttendanceInfo;
     createdAt: number;
     updatedAt: number;
 }

@@ -355,4 +355,53 @@ export const INITIAL_DATABASE_DATA: DatabaseSchema = {
             },
         ],
     },
+    departments: [
+        {
+            id: 'dept_suporte',
+            name: 'Suporte Técnico Especializado',
+            description: 'Diagnósticos de conexão, sinal óptico, modems e lentidão',
+            availableAgentsCount: 2,
+            estimatedWaitSeconds: 30,
+        },
+        {
+            id: 'dept_comercial',
+            name: 'Comercial & Vendas (Fibra Óptica)',
+            description: 'Contratação, upgrade de planos, rede mesh e links dedicados',
+            availableAgentsCount: 2,
+            estimatedWaitSeconds: 15,
+        },
+        {
+            id: 'dept_financeiro',
+            name: 'Financeiro & Cobrança (SAC)',
+            description: '2ª via de boletos, quitação, negociação e comprovantes',
+            availableAgentsCount: 1,
+            estimatedWaitSeconds: 45,
+        },
+    ],
+    agents: [
+        {
+            id: 'agent_mariana',
+            name: 'Mariana Silva',
+            department: 'dept_suporte',
+            departmentName: 'Suporte Técnico',
+            isOnline: true,
+            avatar: 'tabler:headset',
+        },
+        {
+            id: 'agent_carlos',
+            name: 'Carlos Mendes',
+            department: 'dept_comercial',
+            departmentName: 'Comercial & Vendas',
+            isOnline: true,
+            avatar: 'tabler:user-check',
+        },
+        {
+            id: 'agent_juliana',
+            name: 'Juliana Santos',
+            department: 'dept_financeiro',
+            departmentName: 'Financeiro / SAC',
+            isOnline: false,
+            avatar: 'tabler:receipt',
+        },
+    ],
 };

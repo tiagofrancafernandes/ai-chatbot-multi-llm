@@ -10,6 +10,7 @@ import { ChatSession } from '../common/interfaces/chat.interface';
 import { FlowDefinition } from '../common/interfaces/flow.interface';
 import { Contract } from '../common/interfaces/contract.interface';
 import { KnowledgeBaseData } from '../common/interfaces/knowledge.interface';
+import { HumanAgent, AttendanceDepartment } from '../common/interfaces/attendance.interface';
 import { INITIAL_DATABASE_DATA } from './default-database';
 
 @Injectable()
@@ -371,6 +372,46 @@ export class JsonDatabaseService implements OnModuleInit {
         return currentDatabase.knowledgeBase;
     }
 
+    public getDepartments(): AttendanceDepartment[] {
+        const db = this.getDatabase();
+        return db.departments || [];
+    }
+
+    public findDepartmentById(id: string): AttendanceDepartment | undefined {
+        const departments = this.getDepartments();
+        return departments.find((d) => d.id === id);
+    }
+
+    public getAgents(): HumanAgent[] {
+        const db = this.getDatabase();
+        return db.agents || [];
+    }
+
+    public findAgentById(id: string): HumanAgent | undefined {
+        const agents = this.getAgents();
+        return agents.find((a) => a.id === id);
+    }
+
+    public saveAgent(agent: HumanAgent): void {
+        const db = this.getDatabase();
+
+        if (!db.agents) {
+            db.agents = [];
+        }
+
+        const index = db.agents.findIndex((a) => a.id === agent.id);
+
+        if (index >= 0) {
+            db.agents[index] = agent;
+        }
+
+        if (index === -1) {
+            db.agents.push(agent);
+        }
+
+        this.saveDatabase(db);
+    }
+
     private loadDatabase(): void {
         if (!fs.existsSync(this.databaseFilePath)) {
             this.ensureDatabaseFileExists();
@@ -382,6 +423,16 @@ export class JsonDatabaseService implements OnModuleInit {
 
             if (this.cache && !this.cache.contracts) {
                 this.cache.contracts = [];
+            }
+
+            if (this.cache && (!this.cache.departments || this.cache.departments.length === 0)) {
+                this.cache.departments = [...(INITIAL_DATABASE_DATA.departments || [])];
+                this.saveDatabase(this.cache);
+            }
+
+            if (this.cache && (!this.cache.agents || this.cache.agents.length === 0)) {
+                this.cache.agents = [...(INITIAL_DATABASE_DATA.agents || [])];
+                this.saveDatabase(this.cache);
             }
 
             if (this.cache && !this.cache.knowledgeBase) {

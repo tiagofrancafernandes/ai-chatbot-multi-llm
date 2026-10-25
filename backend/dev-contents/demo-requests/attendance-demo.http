@@ -1,0 +1,70 @@
+### Attendance & Human Desk Demonstration Requests
+@baseUrl = http://localhost:3001
+@customerId = 5537999999999
+
+### 1. Initialize Chat Session
+POST {{baseUrl}}/api/chat/init
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}"
+}
+
+### 2. List Available Departments and Human Agents
+GET {{baseUrl}}/api/chat/agents
+
+### 3. Customer Asks for Human Agent (Handoff Options)
+POST {{baseUrl}}/api/chat/message
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}",
+    "text": "Quero falar com um atendente humano"
+}
+
+### 4. Transfer Customer to Department Queue (Suporte Técnico, 30s timeout)
+POST {{baseUrl}}/api/chat/transfer
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}",
+    "departmentId": "dept_suporte",
+    "timeoutSeconds": 30
+}
+
+### 5. Customer Sends Message While AI is Paused
+POST {{baseUrl}}/api/chat/message
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}",
+    "text": "Minha luz LOS está piscando no roteador"
+}
+
+### 6. Human Agent Replies to Customer
+POST {{baseUrl}}/api/chat/agent-message
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}",
+    "agentName": "Mariana Silva",
+    "text": "Olá João! Sou a Mariana do suporte técnico. Estou analisando a potência do seu sinal de fibra óptica neste momento."
+}
+
+### 7. Resume AI Attendance Manually
+POST {{baseUrl}}/api/chat/resume-ai
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}"
+}
+
+### 8. Transfer Directly to Specific Online Agent (Carlos Mendes, Comercial)
+POST {{baseUrl}}/api/chat/transfer
+Content-Type: application/json
+
+{
+    "customerId": "{{customerId}}",
+    "agentId": "agent_carlos",
+    "timeoutSeconds": 45
+}

@@ -5,6 +5,7 @@ import { ChatSession } from './chat.interface';
 import { FlowDefinition } from './flow.interface';
 import { Contract } from './contract.interface';
 import { KnowledgeBaseData } from './knowledge.interface';
+import { HumanAgent, AttendanceDepartment } from './attendance.interface';
 
 export interface DatabaseSchema {
     customers: Customer[];
@@ -14,4 +15,6 @@ export interface DatabaseSchema {
     flow: FlowDefinition;
     contracts: Contract[];
     knowledgeBase: KnowledgeBaseData;
+    agents?: HumanAgent[];
+    departments?: AttendanceDepartment[];
 }

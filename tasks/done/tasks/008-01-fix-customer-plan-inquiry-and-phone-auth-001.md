@@ -48,3 +48,4 @@ Identificação e correção de duas falhas reportadas nas capturas de tela do c
 - 2026-10-25 10:55 - Implementados os handlers de plano atual e dados cadastrais no `FlowEngineService`.
 - 2026-10-25 11:05 - Corrigida configuração do pnpm e Dockerfile do backend com `--ignore-scripts`.
 - 2026-10-25 11:15 - Testes de API realizados com sucesso para as duas mensagens reportadas e para a base de conhecimento. Tarefa concluída.
+

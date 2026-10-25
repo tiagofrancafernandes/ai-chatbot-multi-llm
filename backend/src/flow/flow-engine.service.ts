@@ -1304,7 +1304,40 @@ export class FlowEngineService {
             };
         }
 
-        // 6. Generic / Unknown Fallback for Guests
+        // 6. Human Handoff Intent for Guests
+        if (
+            analysis.primaryIntent === 'human_handoff' ||
+            lowerText.includes('falar com atendente') ||
+            lowerText.includes('atendente humano')
+        ) {
+            const departments = this.databaseService.getDepartments();
+            const response =
+                `🤝 **Central de Atendimento Humano:**\n\n` +
+                `Para melhor direcionar seu atendimento, selecione o setor desejado:\n\n` +
+                `• **Suporte Técnico**: Diagnósticos de fibra óptica e equipamentos (Espera: ~${departments[0]?.estimatedWaitSeconds || 30}s)\n` +
+                `• **Comercial & Vendas**: Planos residenciais e corporativos (Espera: ~${departments[1]?.estimatedWaitSeconds || 15}s)\n` +
+                `• **Financeiro / SAC**: 2ª via, faturas e negociações (Espera: ~${departments[2]?.estimatedWaitSeconds || 45}s)\n\n` +
+                `*(Ao transferir, a IA pausará as respostas automáticas. Se o operador não interagir dentro do tempo limite, a IA reassumirá automaticamente).*`;
+
+            const options = [
+                'Falar com Comercial & Planos',
+                'Falar com Suporte Técnico',
+                'Falar com Financeiro / SAC',
+                'Mariana Silva (Suporte - Online)',
+                'Carlos Mendes (Comercial - Online)',
+                'Continuar com IA',
+            ];
+
+            return {
+                isHandled: true,
+                response,
+                nodeId: 'node_human_handoff_selection',
+                updatedCustomer: currentCustomer,
+                options,
+            };
+        }
+
+        // 7. Generic / Unknown Fallback for Guests
         const response = `Olá! Não consegui identificar sua solicitação.\n\nSe você já é cliente, por favor informe seu telefone ou CPF cadastrado (ex: '5511999999999') para acessar sua conta.\nSe deseja se cadastrar ou contratar um novo plano, basta selecionar abaixo:`;
         const options = ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
 
@@ -1507,15 +1540,153 @@ export class FlowEngineService {
             return this.handlePlanChangeRequest(analysis, customer, session, plans, lowerText);
         }
 
-        // 4. Human Handoff Intent
-        if (analysis.primaryIntent === 'human_handoff') {
-            const response = `Transferindo para um atendente humano especializado. O tempo estimado de resposta é de aproximadamente 2 minutos.\n\nProtocolo: #ATD-${Date.now().toString().slice(-6)}.`;
-            const options = ['Consultar meu plano', 'Ver faturas pendentes', 'Menu principal'];
+        // 4. Manual Transfer Request to Department Queue or Specific Agent
+        const isTransferRequest =
+            lowerText.includes('falar com suporte') ||
+            lowerText.includes('falar com comercial') ||
+            lowerText.includes('falar com financeiro') ||
+            lowerText.includes('falar com sac') ||
+            lowerText.includes('mariana silva') ||
+            lowerText.includes('carlos mendes');
 
-            return { response, nodeId: 'node_fallback_message', options };
+        if (isTransferRequest) {
+            let deptId = 'dept_suporte';
+            let agentId: string | undefined = undefined;
+
+            if (lowerText.includes('comercial') || lowerText.includes('carlos')) {
+                deptId = 'dept_comercial';
+                if (lowerText.includes('carlos')) {
+                    agentId = 'agent_carlos';
+                }
+            }
+
+            if (lowerText.includes('financeiro') || lowerText.includes('sac')) {
+                deptId = 'dept_financeiro';
+            }
+
+            if (lowerText.includes('mariana')) {
+                deptId = 'dept_suporte';
+                agentId = 'agent_mariana';
+            }
+
+            const now = Date.now();
+            const timeout = session.attendance?.timeoutSeconds || 60;
+
+            if (agentId) {
+                const agent = this.databaseService.findAgentById(agentId);
+                const agentName = agent?.name || 'Atendente Humano';
+
+                session.attendance = {
+                    mode: agent?.isOnline ? 'human_active' : 'human_queued',
+                    assignedTo: {
+                        type: 'agent',
+                        id: agentId,
+                        name: agentName,
+                        department: agent?.departmentName,
+                        avatar: agent?.avatar,
+                    },
+                    pausedAt: now,
+                    timeoutSeconds: timeout,
+                    lastAgentInteractionAt: now,
+                    lastCustomerInteractionAt: now,
+                };
+
+                const response = `🔄 **Você foi conectado com ${agentName} (${agent?.departmentName || 'Atendimento'})!**\n\nO atendimento automático por IA foi **pausado**. Envie suas dúvidas e o atendente responderá em instantes.\n\n*(Caso não haja interação por ${timeout} segundos, a IA reassumirá automaticamente).*`;
+                const options = ['Simular resposta do atendente', 'Retomar atendimento com IA', 'Menu principal'];
+
+                return { response, nodeId: 'node_human_agent_active', options };
+            }
+
+            const dept = this.databaseService.findDepartmentById(deptId);
+            const deptName = dept?.name || 'Suporte Técnico';
+
+            session.attendance = {
+                mode: 'human_queued',
+                assignedTo: {
+                    type: 'queue',
+                    id: deptId,
+                    name: `Fila: ${deptName}`,
+                    department: deptName,
+                },
+                queue: {
+                    department: deptId,
+                    departmentName: deptName,
+                    position: 1,
+                    estimatedWaitSeconds: dept?.estimatedWaitSeconds || 30,
+                    enteredAt: now,
+                },
+                pausedAt: now,
+                timeoutSeconds: timeout,
+                lastAgentInteractionAt: now,
+                lastCustomerInteractionAt: now,
+            };
+
+            const response = `⏳ **Transferência realizada para a fila:**\nSetor: **${deptName}**\nPosição atual: **1º lugar** (Tempo estimado: ~${dept?.estimatedWaitSeconds || 30}s).\n\nO atendimento por IA está **pausado**. Envie suas mensagens para o atendente ou clique em 'Retomar atendimento com IA' a qualquer momento.`;
+            const options = ['Simular resposta do atendente', 'Retomar atendimento com IA', 'Menu principal'];
+
+            return { response, nodeId: 'node_human_queue_active', options };
         }
 
-        // 5. Greeting
+        // 5. Resume AI Attendance Request
+        const isResumeAiRequest =
+            lowerText.includes('retomar com ia') ||
+            lowerText.includes('retomar atendimento com ia') ||
+            lowerText.includes('continuar com ia') ||
+            lowerText.includes('voltar para a ia') ||
+            lowerText.includes('voltar pra ia') ||
+            lowerText.includes('atendimento automatizado');
+
+        if (isResumeAiRequest) {
+            session.attendance = {
+                mode: 'ai',
+                assignedTo: {
+                    type: 'ai',
+                    name: 'SystemOne AI',
+                },
+                timeoutSeconds: session.attendance?.timeoutSeconds || 60,
+            };
+
+            const response = `🤖 **Atendimento automatizado reativado!**\n\nA IA SystemOne reassumiu o suporte. Como posso te ajudar agora?`;
+            const options = [
+                'Qual é o meu plano atual?',
+                'Quero mudar para o plano mais barato',
+                'Ver minhas faturas',
+                'Consultar cobertura',
+                'Falar com atendente',
+            ];
+
+            return { response, nodeId: 'node_ai_resumed', options };
+        }
+
+        // 6. Human Handoff Intent
+        if (
+            analysis.primaryIntent === 'human_handoff' ||
+            lowerText.includes('falar com atendente') ||
+            lowerText.includes('atendente humano') ||
+            lowerText.includes('falar com humano')
+        ) {
+            const departments = this.databaseService.getDepartments();
+            const response =
+                `🤝 **Central de Atendimento Humano:**\n\n` +
+                `Para melhor direcionar seu atendimento, selecione o setor desejado ou um atendente online:\n\n` +
+                `• **Suporte Técnico**: Diagnósticos de fibra óptica e rede (Espera: ~${departments[0]?.estimatedWaitSeconds || 30}s)\n` +
+                `• **Comercial & Vendas**: Planos residenciais e corporativos (Espera: ~${departments[1]?.estimatedWaitSeconds || 15}s)\n` +
+                `• **Financeiro / SAC**: 2ª via de boletos e comprovantes (Espera: ~${departments[2]?.estimatedWaitSeconds || 45}s)\n\n` +
+                `*(Ao transferir, a IA pausará as respostas automáticas. Se o operador não interagir dentro do tempo limite, a IA reassumirá automaticamente).*`;
+
+            const options = [
+                'Falar com Suporte Técnico',
+                'Falar com Comercial & Planos',
+                'Falar com Financeiro / SAC',
+                'Mariana Silva (Suporte - Online)',
+                'Carlos Mendes (Comercial - Online)',
+                'Continuar com IA',
+            ];
+
+            return { response, nodeId: 'node_human_handoff_selection', options };
+        }
+
+        // 7. Greeting
         if (analysis.primaryIntent === 'greeting') {
             const greetingNode = this.findNode(flow, 'node_greeting_message');
             const template =
