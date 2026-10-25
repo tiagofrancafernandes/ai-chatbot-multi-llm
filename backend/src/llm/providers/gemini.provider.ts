@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
     LlmProvider,
     IntentAnalysisResult,
+    IntentContext,
     PrimaryIntent,
     SecondaryRequest,
 } from '../interfaces/llm-provider.interface';
@@ -29,28 +30,47 @@ export class GeminiProvider implements LlmProvider {
         return Boolean(this.apiKey && this.apiKey.trim().length > 0 && this.apiKey !== 'your_gemini_api_key_here');
     }
 
-    public async analyzeIntent(text: string, modelOverride?: string): Promise<IntentAnalysisResult> {
+    public async analyzeIntent(
+        text: string,
+        modelOverride?: string,
+        context?: IntentContext
+    ): Promise<IntentAnalysisResult> {
         if (!text) {
-            return evaluateFallbackIntent('', this.providerId);
+            return evaluateFallbackIntent('', this.providerId, context);
         }
 
         if (!this.isConfigured()) {
             this.logger.debug('Gemini API key is not configured. Falling back to heuristic triage.');
-            return evaluateFallbackIntent(text, this.providerId);
+            return evaluateFallbackIntent(text, this.providerId, context);
         }
 
         const model = modelOverride || this.defaultModel;
+
+        const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+        if (context?.previousBotMessage) {
+            contents.push({
+                role: 'model',
+                parts: [{ text: context.previousBotMessage }],
+            });
+        }
+
+        let userPrompt = `Analyze user input and return strict JSON:\n"${text}"`;
+
+        if (context?.hasPendingAction && context?.pendingActionType) {
+            userPrompt = `[Context: Action "${context.pendingActionType}" is pending confirmation]. User input: "${text}"`;
+        }
+
+        contents.push({
+            role: 'user',
+            parts: [{ text: userPrompt }],
+        });
 
         const requestPayload = {
             systemInstruction: {
                 parts: [{ text: INTENT_SYSTEM_PROMPT }],
             },
-            contents: [
-                {
-                    role: 'user',
-                    parts: [{ text: `Analyze the following user input and return strict JSON:\n"${text}"` }],
-                },
-            ],
+            contents,
             generationConfig: {
                 responseMimeType: 'application/json',
                 temperature: 0.1,
@@ -68,7 +88,7 @@ export class GeminiProvider implements LlmProvider {
 
             if (!response.ok) {
                 this.logger.warn(`Gemini API returned status ${response.status}. Using heuristic fallback.`);
-                return evaluateFallbackIntent(text, this.providerId);
+                return evaluateFallbackIntent(text, this.providerId, context);
             }
 
             const data = (await response.json()) as {
@@ -82,7 +102,7 @@ export class GeminiProvider implements LlmProvider {
             const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (!rawText) {
-                return evaluateFallbackIntent(text, this.providerId);
+                return evaluateFallbackIntent(text, this.providerId, context);
             }
 
             const parsed = JSON.parse(rawText) as {
@@ -90,21 +110,31 @@ export class GeminiProvider implements LlmProvider {
                 secondaryRequest?: string;
                 isClientExplicit?: boolean;
                 extractedIdentifier?: string;
+                actionDetail?: string;
+                targetPlan?: string;
+                extractedAddress?: string;
+                suggestedOptions?: string[];
             };
 
+            const primaryIntent = this.normalizePrimaryIntent(parsed.primaryIntent);
+
             return {
-                primaryIntent: this.normalizePrimaryIntent(parsed.primaryIntent),
+                primaryIntent,
                 secondaryRequest: this.normalizeSecondaryRequest(parsed.secondaryRequest),
                 isClientExplicit: Boolean(parsed.isClientExplicit),
                 extractedIdentifier: parsed.extractedIdentifier || undefined,
                 confidence: 0.98,
                 providerUsed: this.providerId,
                 modelUsed: model,
+                actionDetail: parsed.actionDetail || undefined,
+                targetPlan: parsed.targetPlan || undefined,
+                extractedAddress: parsed.extractedAddress || undefined,
+                suggestedOptions: parsed.suggestedOptions || undefined,
                 rawResponse: parsed,
             };
         } catch (error) {
             this.logger.warn(`Gemini analysis error: ${(error as Error).message}. Falling back.`);
-            return evaluateFallbackIntent(text, this.providerId);
+            return evaluateFallbackIntent(text, this.providerId, context);
         }
     }
 
@@ -181,6 +211,30 @@ export class GeminiProvider implements LlmProvider {
 
         if (normalized === 'plan_pricing') {
             return 'plan_pricing';
+        }
+
+        if (normalized === 'plan_change') {
+            return 'plan_change';
+        }
+
+        if (normalized === 'cancellation') {
+            return 'cancellation';
+        }
+
+        if (normalized === 'address_change') {
+            return 'address_change';
+        }
+
+        if (normalized === 'confirmation_yes') {
+            return 'confirmation_yes';
+        }
+
+        if (normalized === 'confirmation_no') {
+            return 'confirmation_no';
+        }
+
+        if (normalized === 'human_handoff') {
+            return 'human_handoff';
         }
 
         if (normalized === 'technical_support') {

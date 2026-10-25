@@ -49,8 +49,6 @@ yarn.lock
 !.env.example
 
 # Local JSON database storage
-backend/data/
-data/
 *.db.json
 db.json
 

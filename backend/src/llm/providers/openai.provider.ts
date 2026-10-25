@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
     LlmProvider,
     IntentAnalysisResult,
+    IntentContext,
     PrimaryIntent,
     SecondaryRequest,
 } from '../interfaces/llm-provider.interface';
@@ -29,13 +30,17 @@ export class OpenAiProvider implements LlmProvider {
         return Boolean(this.apiKey && this.apiKey.trim().length > 0 && this.apiKey !== 'your_openai_api_key_here');
     }
 
-    public async analyzeIntent(text: string, modelOverride?: string): Promise<IntentAnalysisResult> {
+    public async analyzeIntent(
+        text: string,
+        modelOverride?: string,
+        context?: IntentContext
+    ): Promise<IntentAnalysisResult> {
         if (!text) {
-            return evaluateFallbackIntent('', this.providerId);
+            return evaluateFallbackIntent('', this.providerId, context);
         }
 
         if (!this.isConfigured()) {
-            return evaluateFallbackIntent(text, this.providerId);
+            return evaluateFallbackIntent(text, this.providerId, context);
         }
 
         const model = modelOverride || this.defaultModel;

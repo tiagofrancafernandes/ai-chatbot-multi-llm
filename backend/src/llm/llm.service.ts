@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LlmProvider, IntentAnalysisResult, ProviderInfo } from './interfaces/llm-provider.interface';
+import { LlmProvider, IntentAnalysisResult, IntentContext, ProviderInfo } from './interfaces/llm-provider.interface';
 import { OllamaProvider } from './providers/ollama.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { OpenAiProvider } from './providers/openai.provider';
@@ -126,7 +126,8 @@ export class LlmService {
     public async analyzeIntent(
         text: string,
         providerId?: string,
-        modelOverride?: string
+        modelOverride?: string,
+        context?: IntentContext
     ): Promise<IntentAnalysisResult> {
         const targetId = providerId || this.activeProviderId;
         const provider = this.getProvider(targetId);
@@ -141,7 +142,7 @@ export class LlmService {
             targetModel = provider.defaultModel;
         }
 
-        const analysis = await provider.analyzeIntent(text, targetModel);
+        const analysis = await provider.analyzeIntent(text, targetModel, context);
 
         return analysis;
     }

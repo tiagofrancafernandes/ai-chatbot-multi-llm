@@ -3,10 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import {
     LlmProvider,
     IntentAnalysisResult,
+    IntentContext,
     PrimaryIntent,
     SecondaryRequest,
 } from '../interfaces/llm-provider.interface';
-import { evaluateFallbackIntent } from '../utils/intent-prompt';
+import { INTENT_SYSTEM_PROMPT, evaluateFallbackIntent } from '../utils/intent-prompt';
 
 @Injectable()
 export class OllamaProvider implements LlmProvider {
@@ -15,6 +16,7 @@ export class OllamaProvider implements LlmProvider {
     public readonly providerId = 'ollama';
     public readonly displayName = 'Ollama (Local / SystemOne)';
     public readonly defaultModel: string;
+    public readonly fallbackModel: string;
     public readonly availableModels: string[];
 
     private readonly host: string;
@@ -22,20 +24,79 @@ export class OllamaProvider implements LlmProvider {
     constructor(private readonly configService: ConfigService) {
         this.host = this.configService.get<string>('OLLAMA_HOST') || 'http://localhost:11434';
         this.defaultModel = this.configService.get<string>('OLLAMA_DECISION_MODEL') || 'tev1:0.8b';
-        this.availableModels = ['tev1:0.8b', 'nimble', 'llama3.2:1b', 'llama3.2:3b', 'qwen2.5:0.5b'];
+        this.fallbackModel = this.configService.get<string>('OLLAMA_FALLBACK_MODEL') || 'qwen2.5:0.5b';
+        this.availableModels = [
+            'tev1:0.8b',
+            'qwen2.5:0.5b',
+            'llama3.2:1b-instruct-q4_0',
+            'llama3.2:1b',
+            'llama3.2:3b',
+            'nimble',
+        ];
     }
 
     public isConfigured(): boolean {
         return Boolean(this.host);
     }
 
-    public async analyzeIntent(text: string, modelOverride?: string): Promise<IntentAnalysisResult> {
+    public async analyzeIntent(
+        text: string,
+        modelOverride?: string,
+        context?: IntentContext
+    ): Promise<IntentAnalysisResult> {
         if (!text) {
-            return evaluateFallbackIntent('', this.providerId);
+            return evaluateFallbackIntent('', this.providerId, context);
         }
 
         const model = modelOverride || this.defaultModel;
 
+        // If target model is explicitly overridden to a specific non-tev1 model
+        if (modelOverride && modelOverride !== this.defaultModel) {
+            return this.analyzeWithFallbackModel(text, modelOverride, context);
+        }
+
+        // STEP 1: ALWAYS use tev1:0.8b first to analyze and try to identify intentions
+        const tev1Result = await this.tryTev1Analysis(text, model);
+
+        // Check if user text has explicit telecom action keywords that tev1 doesn't have categories for
+        const hasActionClues = this.hasSubtleActionKeywords(text);
+
+        // If tev1 returned unknown and there are no telecom action keywords, respect unknown!
+        if (tev1Result && tev1Result.primaryIntent === 'unknown' && !hasActionClues && !context?.hasPendingAction) {
+            return tev1Result;
+        }
+
+        // If tev1 definitively identified a standard intent without ambiguity or action sub-intents
+        if (tev1Result && tev1Result.primaryIntent !== 'unknown' && !context?.hasPendingAction && !hasActionClues) {
+            return tev1Result;
+        }
+
+        // STEP 2: When tev1 does not comprehend, or query involves multi-turn actions/confirmations,
+        // engage lightweight model (qwen2.5:0.5b) in Ollama to analyze and extract rich intention
+        this.logger.log(
+            `tev1:0.8b returned "${tev1Result?.primaryIntent || 'unknown'}". Cascading to lightweight Ollama model (${this.fallbackModel}) for deep intent analysis.`
+        );
+
+        const secondaryResult = await this.analyzeWithFallbackModel(text, this.fallbackModel, context);
+
+        return secondaryResult;
+    }
+
+    private hasSubtleActionKeywords(text: string): boolean {
+        const lower = text.toLowerCase();
+        return (
+            lower.includes('mudar') ||
+            lower.includes('trocar') ||
+            lower.includes('mais barato') ||
+            lower.includes('cancelar') ||
+            lower.includes('cancela') ||
+            lower.includes('endereço') ||
+            lower.includes('endereco') ||
+            lower.includes('mudei')
+        );
+    }
+
+    private async tryTev1Analysis(text: string, model: string): Promise<IntentAnalysisResult | null> {
         const systemOnePayload = {
             model,
             state: text,
@@ -79,25 +140,24 @@ export class OllamaProvider implements LlmProvider {
             });
 
             if (!response.ok) {
-                this.logger.warn(
-                    `Ollama /v1/systemone returned status ${response.status}. Attempting standard fallback.`
-                );
-                return evaluateFallbackIntent(text, this.providerId);
+                this.logger.warn(`Ollama /v1/systemone returned ${response.status}.`);
+                return null;
             }
 
             const data = (await response.json()) as {
                 answers?: {
-                    primaryIntent?: { choice?: string; value?: string };
+                    primaryIntent?: { choice?: string; value?: string; confidence?: number };
                     secondaryRequest?: { choice?: string; value?: string };
                     isClientExplicit?: { noul?: number | string | boolean; value?: string };
                 };
             };
 
             const rawPrimary = data.answers?.primaryIntent?.choice || data.answers?.primaryIntent?.value;
+            const primaryIntent = this.normalizePrimaryIntent(rawPrimary);
+            const rawConfidence = data.answers?.primaryIntent?.confidence ?? 0.92;
+
             const rawSecondary = data.answers?.secondaryRequest?.choice || data.answers?.secondaryRequest?.value;
             const rawClientNoul = data.answers?.isClientExplicit?.noul ?? data.answers?.isClientExplicit?.value;
-
-            const primaryIntent = this.normalizePrimaryIntent(rawPrimary);
             const secondaryRequest = this.normalizeSecondaryRequest(rawSecondary);
 
             let isClientExplicit = false;
@@ -124,16 +184,118 @@ export class OllamaProvider implements LlmProvider {
                 secondaryRequest,
                 isClientExplicit: isClientExplicit || Boolean(extractedIdentifier),
                 extractedIdentifier,
-                confidence: 0.95,
+                confidence: rawConfidence,
                 providerUsed: this.providerId,
                 modelUsed: model,
                 rawResponse: data,
             };
         } catch (error) {
-            this.logger.warn(
-                `Failed to connect to Ollama at ${this.host}: ${(error as Error).message}. Using heuristic triage.`
-            );
-            return evaluateFallbackIntent(text, this.providerId);
+            this.logger.warn(`Failed connecting to Ollama SystemOne (${(error as Error).message}).`);
+            return null;
+        }
+    }
+
+    public async analyzeWithFallbackModel(
+        text: string,
+        modelName?: string,
+        context?: IntentContext
+    ): Promise<IntentAnalysisResult> {
+        const targetModel = modelName || this.fallbackModel;
+
+        const messages: Array<{ role: string; content: string }> = [
+            {
+                role: 'system',
+                content: INTENT_SYSTEM_PROMPT,
+            },
+        ];
+
+        if (context?.previousBotMessage) {
+            messages.push({
+                role: 'assistant',
+                content: context.previousBotMessage,
+            });
+        }
+
+        let contextualUserPrompt = text;
+
+        if (context?.hasPendingAction && context?.pendingActionType) {
+            contextualUserPrompt = `[Contexto: Confirmação pendente de "${context.pendingActionType}"]. Mensagem do usuário: "${text}"`;
+        }
+
+        messages.push({
+            role: 'user',
+            content: contextualUserPrompt,
+        });
+
+        try {
+            const chatUrl = `${this.host}/api/chat`;
+            const response = await fetch(chatUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: targetModel,
+                    messages,
+                    format: 'json',
+                    stream: false,
+                }),
+                signal: AbortSignal.timeout(6000),
+            });
+
+            if (!response.ok) {
+                this.logger.warn(`Ollama fallback model returned ${response.status}. Using rule engine.`);
+                return evaluateFallbackIntent(text, this.providerId, context);
+            }
+
+            const data = (await response.json()) as { message?: { content?: string } };
+            const rawContent = data.message?.content?.trim();
+
+            if (!rawContent) {
+                return evaluateFallbackIntent(text, this.providerId, context);
+            }
+
+            const parsed = JSON.parse(rawContent) as {
+                primaryIntent?: string;
+                secondaryRequest?: string;
+                actionDetail?: string;
+                targetPlan?: string;
+                extractedAddress?: string;
+                isClientExplicit?: boolean;
+                extractedIdentifier?: string;
+                suggestedOptions?: string[];
+            };
+
+            const primaryIntent = this.normalizePrimaryIntent(parsed.primaryIntent);
+
+            // If parsed intent is unknown, verify with rule heuristics
+            if (primaryIntent === 'unknown') {
+                const heuristic = evaluateFallbackIntent(text, this.providerId, context);
+
+                if (heuristic.primaryIntent !== 'unknown') {
+                    return heuristic;
+                }
+            }
+
+            const phoneOrIdPattern = /\b(?:\d{10,13}|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/;
+            const idMatch = text.match(phoneOrIdPattern);
+            const extractedIdentifier = parsed.extractedIdentifier || (idMatch ? idMatch[0] : undefined);
+
+            return {
+                primaryIntent,
+                secondaryRequest: this.normalizeSecondaryRequest(parsed.secondaryRequest),
+                isClientExplicit: Boolean(parsed.isClientExplicit || extractedIdentifier),
+                extractedIdentifier,
+                confidence: 0.94,
+                providerUsed: this.providerId,
+                modelUsed: targetModel,
+                actionDetail: parsed.actionDetail || undefined,
+                targetPlan: parsed.targetPlan || undefined,
+                extractedAddress: parsed.extractedAddress || undefined,
+                suggestedOptions: parsed.suggestedOptions || undefined,
+                rawResponse: parsed,
+            };
+        } catch (error) {
+            this.logger.warn(`Fallback model analysis failed: ${(error as Error).message}. Using heuristic fallback.`);
+            return evaluateFallbackIntent(text, this.providerId, context);
         }
     }
 
@@ -170,7 +332,6 @@ export class OllamaProvider implements LlmProvider {
             }
 
             const data = (await response.json()) as { message?: { content?: string } };
-
             const content = data.message?.content?.trim();
 
             if (!content) {
@@ -197,6 +358,30 @@ export class OllamaProvider implements LlmProvider {
 
         if (normalized === 'plan_pricing') {
             return 'plan_pricing';
+        }
+
+        if (normalized === 'plan_change') {
+            return 'plan_change';
+        }
+
+        if (normalized === 'cancellation') {
+            return 'cancellation';
+        }
+
+        if (normalized === 'address_change') {
+            return 'address_change';
+        }
+
+        if (normalized === 'confirmation_yes') {
+            return 'confirmation_yes';
+        }
+
+        if (normalized === 'confirmation_no') {
+            return 'confirmation_no';
+        }
+
+        if (normalized === 'human_handoff') {
+            return 'human_handoff';
         }
 
         if (normalized === 'technical_support') {

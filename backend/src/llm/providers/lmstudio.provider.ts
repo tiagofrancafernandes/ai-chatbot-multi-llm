@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
     LlmProvider,
     IntentAnalysisResult,
+    IntentContext,
     PrimaryIntent,
     SecondaryRequest,
 } from '../interfaces/llm-provider.interface';
@@ -29,9 +30,13 @@ export class LmStudioProvider implements LlmProvider {
         return Boolean(this.host);
     }
 
-    public async analyzeIntent(text: string, modelOverride?: string): Promise<IntentAnalysisResult> {
+    public async analyzeIntent(
+        text: string,
+        modelOverride?: string,
+        context?: IntentContext
+    ): Promise<IntentAnalysisResult> {
         if (!text) {
-            return evaluateFallbackIntent('', this.providerId);
+            return evaluateFallbackIntent('', this.providerId, context);
         }
 
         const model = modelOverride || this.defaultModel;
