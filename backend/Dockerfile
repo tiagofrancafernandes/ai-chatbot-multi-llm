@@ -2,9 +2,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@11.10.0
 
-COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml .npmrc ./
 COPY backend/package.json ./backend/
 
 RUN pnpm install --frozen-lockfile --filter backend
@@ -18,16 +18,18 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@11.10.0
 
-COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml .npmrc ./
 COPY backend/package.json ./backend/
 
 RUN pnpm install --prod --frozen-lockfile --filter backend
 
-COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/dist ./backend/dist
 
-EXPOSE 3000
+WORKDIR /app/backend
+
+EXPOSE 3001
 
 CMD ["node", "dist/main"]
 

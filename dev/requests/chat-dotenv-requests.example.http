@@ -87,3 +87,4 @@ Authorization: Bearer {{$dotenv AUTH_TOKEN}}
 {
     "customerId": "{{CUSTOMER_REF}}"
 }
+

@@ -128,10 +128,20 @@ export class LlmService {
         providerId?: string,
         modelOverride?: string
     ): Promise<IntentAnalysisResult> {
-        const provider = this.getProvider(providerId);
-        const model = modelOverride || this.activeModelOverride || provider.defaultModel;
+        const targetId = providerId || this.activeProviderId;
+        const provider = this.getProvider(targetId);
 
-        const analysis = await provider.analyzeIntent(text, model);
+        let targetModel = modelOverride;
+
+        if (!targetModel && targetId === this.activeProviderId && this.activeModelOverride) {
+            targetModel = this.activeModelOverride;
+        }
+
+        if (!targetModel) {
+            targetModel = provider.defaultModel;
+        }
+
+        const analysis = await provider.analyzeIntent(text, targetModel);
 
         return analysis;
     }
@@ -142,10 +152,20 @@ export class LlmService {
         providerId?: string,
         modelOverride?: string
     ): Promise<string> {
-        const provider = this.getProvider(providerId);
-        const model = modelOverride || this.activeModelOverride || provider.defaultModel;
+        const targetId = providerId || this.activeProviderId;
+        const provider = this.getProvider(targetId);
 
-        const generated = await provider.generateText(prompt, systemInstruction, model);
+        let targetModel = modelOverride;
+
+        if (!targetModel && targetId === this.activeProviderId && this.activeModelOverride) {
+            targetModel = this.activeModelOverride;
+        }
+
+        if (!targetModel) {
+            targetModel = provider.defaultModel;
+        }
+
+        const generated = await provider.generateText(prompt, systemInstruction, targetModel);
 
         return generated;
     }

@@ -2,12 +2,12 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@11.10.0
 
-COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml .npmrc ./
 COPY frontend/package.json ./frontend/
 
-RUN pnpm install --frozen-lockfile --filter frontend
+RUN pnpm install --frozen-lockfile --filter frontend --config.ignore-scripts=true
 
 COPY frontend ./frontend
 

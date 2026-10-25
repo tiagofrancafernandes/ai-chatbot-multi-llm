@@ -11,7 +11,8 @@ services:
             - PORT=${BACKEND_PORT:-3001}
             - DEFAULT_PROVIDER=${DEFAULT_PROVIDER:-ollama}
             - DEFAULT_MODEL=${DEFAULT_MODEL:-tev1:0.8b}
-            - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+            - ENABLED_PROVIDERS=${ENABLED_PROVIDERS:-ollama,gemini}
+            - OLLAMA_HOST=http://host.docker.internal:11434
             - OLLAMA_DECISION_MODEL=${OLLAMA_DECISION_MODEL:-tev1:0.8b}
             - OLLAMA_CHAT_MODEL=${OLLAMA_CHAT_MODEL:-llama3.2:1b}
             - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -30,10 +31,17 @@ services:
             context: .
             dockerfile: frontend/Dockerfile
             args:
-                - VITE_API_URL=${VITE_API_URL:-http://localhost:3000/api}
+                - VITE_API_URL=${VITE_API_URL:-http://localhost:3001/api}
         container_name: chatbot_frontend
         restart: unless-stopped
         ports:
-            - '${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}'
+            - '${FRONTEND_PORT:-5174}:5173'
         depends_on:
             - backend
+
+    ollama_bridge:
+        image: alpine/socat
+        container_name: chatbot_ollama_bridge
+        restart: unless-stopped
+        network_mode: host
+        command: 'TCP-LISTEN:11434,bind=172.17.0.1,reuseaddr,fork TCP:127.0.0.1:11434'
