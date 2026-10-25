@@ -288,30 +288,14 @@ export class FlowEngineService {
             return null;
         }
 
-        const isCancel = this.isNegativeConfirmation(text, analysis);
+        const lower = text.toLowerCase().trim();
 
-        if (isCancel) {
-            const contract = this.databaseService.findContractById(pending.contractId);
-
-            if (contract) {
-                contract.status = 'cancelled';
-                this.databaseService.saveContract(contract);
-            }
-
-            session.pendingAction = null;
-
-            return {
-                response: 'A formalização do contrato foi cancelada conforme solicitado.\n\nComo mais posso te ajudar?',
-                nodeId: 'node_contract_cancelled',
-                options: ['Ver planos disponíveis', 'Falar com atendente', 'Menu principal'],
-                updatedCustomer: customer,
-            };
-        }
-
+        // 1. Signature simulation or signature claim MUST be evaluated first
         const isSimulate =
             analysis.primaryIntent === 'simulate_signature' ||
-            text.toLowerCase().includes('simular assinatura') ||
-            text.toLowerCase().includes('simular contrato');
+            lower.includes('simular assinatura') ||
+            lower.includes('simular contrato') ||
+            lower.includes('simular');
 
         if (isSimulate) {
             this.databaseService.signContract(pending.contractId);
@@ -320,12 +304,34 @@ export class FlowEngineService {
         const isSignedClaim =
             isSimulate ||
             analysis.primaryIntent === 'contract_signed' ||
-            text.toLowerCase().includes('assinei') ||
-            text.toLowerCase().includes('assinado') ||
-            text.toLowerCase().includes('já assinei') ||
-            text.toLowerCase().includes('ja assinei');
+            lower.includes('assinei') ||
+            lower.includes('assinado') ||
+            lower.includes('já assinei') ||
+            lower.includes('ja assinei') ||
+            lower.includes('acabei de assinar');
 
         if (!isSignedClaim) {
+            const isCancel = this.isNegativeConfirmation(text, analysis);
+
+            if (isCancel) {
+                const contract = this.databaseService.findContractById(pending.contractId);
+
+                if (contract) {
+                    contract.status = 'cancelled';
+                    this.databaseService.saveContract(contract);
+                }
+
+                session.pendingAction = null;
+
+                return {
+                    response:
+                        'A formalização do contrato foi cancelada conforme solicitado.\n\nComo mais posso te ajudar?',
+                    nodeId: 'node_contract_cancelled',
+                    options: ['Ver planos disponíveis', 'Falar com atendente', 'Menu principal'],
+                    updatedCustomer: customer,
+                };
+            }
+
             return {
                 response: `Estamos aguardando a assinatura digital do seu contrato:\n\n📄 **Contrato Nº:** \`${pending.contractId}\`\n🔗 **Link:** [Assinar Contrato Digital](${pending.contractUrl})\n\nAssim que assinar, digite **'já assinei'**! Ou clique em 'Simular assinatura do contrato' para testar.`,
                 nodeId: 'node_contract_verification',
@@ -720,11 +726,24 @@ export class FlowEngineService {
     }
 
     private isNegativeConfirmation(text: string, analysis: IntentAnalysisResult): boolean {
+        const lower = text.toLowerCase().trim();
+
+        // Safeguard: signature simulation, signing claims or registration keywords are NEVER negative confirmation
+        if (
+            lower.includes('simular') ||
+            lower.includes('assinei') ||
+            lower.includes('assinado') ||
+            lower.includes('assinatura') ||
+            lower.includes('contratar') ||
+            lower.includes('cadastrar')
+        ) {
+            return false;
+        }
+
         if (analysis.primaryIntent === 'confirmation_no') {
             return true;
         }
 
-        const lower = text.toLowerCase().trim();
         return (
             lower.startsWith('não') ||
             lower.startsWith('nao') ||

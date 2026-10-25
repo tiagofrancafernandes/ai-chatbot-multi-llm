@@ -48,6 +48,19 @@ export class OllamaProvider implements LlmProvider {
             return evaluateFallbackIntent('', this.providerId, context);
         }
 
+        const lower = text.toLowerCase().trim();
+
+        // Deterministic contract signature actions
+        if (
+            lower.includes('simular assinatura') ||
+            lower.includes('simular contrato') ||
+            lower.includes('já assinei') ||
+            lower.includes('ja assinei') ||
+            lower.includes('contrato assinado')
+        ) {
+            return evaluateFallbackIntent(text, this.providerId, context);
+        }
+
         const model = modelOverride || this.defaultModel;
 
         // If target model is explicitly overridden to a specific non-tev1 model

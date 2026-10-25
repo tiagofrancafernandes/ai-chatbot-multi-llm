@@ -26,8 +26,8 @@ Intent Definitions:
 - "customer_registration": User (visitor/prospect) wants to register, sign up, create an account, or open customer profile (e.g. "quero me registrar", "criar conta", "fazer cadastro", "novo cliente", "cadastrar").
 - "plan_pricing": Inquiries about available plans, pricing, values, or asking "qual meu plano atual?".
 - "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano Starter", "contratar o plano pro", "assinar de 49.90").
-- "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado").
-- "simulate_signature": User wants to simulate digital signature ("simular assinatura", "simular contrato").
+- "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado"). NEVER classify as confirmation_no!
+- "simulate_signature": User wants to simulate digital signature ("simular assinatura", "simular contrato"). NEVER classify "simular assinatura" as confirmation_no or cancellation!
 - "plan_change": User wants to change, switch, upgrade, or downgrade plan (e.g., "mudar para o plano Professional", "trocar pro Starter", "mudar pro mais barato"). If user mentions a specific plan, targetPlan MUST be that plan ("Professional", "Starter", "Premium Business"), NOT "cheapest".
 - "cancellation": User wants to cancel subscription or contract (e.g., "quero cancelar", "cancela meu plano", "encerrar assinatura").
 - "address_change": User requests address update (e.g., "mudei de casa", "trocar meu endereço pra Rua X 123", "novo endereço").
@@ -52,7 +52,40 @@ export function evaluateFallbackIntent(
     let extractedAddress: string | undefined;
     let actionDetail: string | undefined;
 
-    // 1. Pending Action Confirmation Checks
+    // 1. Contract Simulation & Signature Checks (Absolute Priority)
+    if (text.includes('simular assinatura') || text.includes('simular contrato') || text.includes('simular')) {
+        return {
+            primaryIntent: 'simulate_signature',
+            secondaryRequest: 'none',
+            isClientExplicit: true,
+            confidence: 0.99,
+            providerUsed: providerName,
+            modelUsed: 'heuristic-rule-engine',
+            actionDetail: 'simulate_signature',
+        };
+    }
+
+    const isContractSigned =
+        text.includes('assinei') ||
+        text.includes('ja assinei') ||
+        text.includes('já assinei') ||
+        text.includes('contrato assinado') ||
+        text.includes('assinado com sucesso') ||
+        text.includes('acabei de assinar');
+
+    if (isContractSigned) {
+        return {
+            primaryIntent: 'contract_signed',
+            secondaryRequest: 'none',
+            isClientExplicit: true,
+            confidence: 0.99,
+            providerUsed: providerName,
+            modelUsed: 'heuristic-rule-engine',
+            actionDetail: 'contract_signed',
+        };
+    }
+
+    // 2. Pending Action Confirmation Checks
     if (context?.hasPendingAction) {
         const isYes =
             text === 'sim' ||
@@ -104,39 +137,6 @@ export function evaluateFallbackIntent(
                 actionDetail: 'cancel_pending_action',
             };
         }
-    }
-
-    // Contract Simulation & Signature Checks
-    if (text.includes('simular assinatura') || text.includes('simular contrato')) {
-        return {
-            primaryIntent: 'simulate_signature',
-            secondaryRequest: 'none',
-            isClientExplicit: true,
-            confidence: 0.99,
-            providerUsed: providerName,
-            modelUsed: 'heuristic-rule-engine',
-            actionDetail: 'simulate_signature',
-        };
-    }
-
-    const isContractSigned =
-        text.includes('assinei') ||
-        text.includes('ja assinei') ||
-        text.includes('já assinei') ||
-        text.includes('contrato assinado') ||
-        text.includes('assinado com sucesso') ||
-        text.includes('acabei de assinar');
-
-    if (isContractSigned) {
-        return {
-            primaryIntent: 'contract_signed',
-            secondaryRequest: 'none',
-            isClientExplicit: true,
-            confidence: 0.99,
-            providerUsed: providerName,
-            modelUsed: 'heuristic-rule-engine',
-            actionDetail: 'contract_signed',
-        };
     }
 
     // Customer Registration Intent (Visitor / Prospect)
