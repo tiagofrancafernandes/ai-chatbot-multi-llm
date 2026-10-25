@@ -254,10 +254,15 @@ export class OllamaProvider implements LlmProvider {
     ): Promise<IntentAnalysisResult> {
         const targetModel = modelName || this.fallbackModel;
 
+        let systemPrompt = INTENT_SYSTEM_PROMPT;
+        if (context?.temporalContext) {
+            systemPrompt += `\n\n[TEMPORAL CONTEXT]\n${context.temporalContext}`;
+        }
+
         const messages: Array<{ role: string; content: string }> = [
             {
                 role: 'system',
-                content: INTENT_SYSTEM_PROMPT,
+                content: systemPrompt,
             },
         ];
 

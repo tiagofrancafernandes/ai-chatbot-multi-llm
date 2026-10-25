@@ -12,4 +12,8 @@ export class InitChatDto {
     @IsOptional()
     @IsString()
     public model?: string;
+
+    @IsOptional()
+    @IsString()
+    public scope?: string;
 }

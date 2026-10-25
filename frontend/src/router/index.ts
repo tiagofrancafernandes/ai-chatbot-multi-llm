@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import ChatView from '../views/ChatView.vue';
+import HomePortalView from '../views/HomePortalView.vue';
+import ClientChatView from '../views/ClientChatView.vue';
+import AttendantChatView from '../views/AttendantChatView.vue';
 import FlowView from '../views/FlowView.vue';
 import KnowledgeView from '../views/KnowledgeView.vue';
 
@@ -8,8 +10,22 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            name: 'chat',
-            component: ChatView,
+            name: 'portal',
+            component: HomePortalView,
+        },
+        {
+            path: '/chat/cliente',
+            name: 'client-chat',
+            component: ClientChatView,
+        },
+        {
+            path: '/chat/atendente',
+            name: 'attendant-chat',
+            component: AttendantChatView,
+        },
+        {
+            path: '/chat/atentende',
+            redirect: '/chat/atendente',
         },
         {
             path: '/flow',

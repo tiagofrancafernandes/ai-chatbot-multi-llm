@@ -294,5 +294,170 @@ Content-Type: application/json
     "text": "Simular assinatura do contrato"
 }
 
+### 28. Operator Console - List All Active Chat Sessions
+# @name listChatSessions
+GET {{BASE_URL}}/api/chat/sessions
+Accept: application/json
+
+### 29. Plan Triage - Default Plans Inquiry (Urban as Default, Rural as Alternative & Asks Area)
+# @name planTriageDefault
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Quero ver os planos de internet fibra"
+}
+
+### 30. Plan Triage - Select Rural Area (Presents Detailed Rural Plans & Distances)
+# @name planTriageRuralArea
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Área rural (sítio / arredores)"
+}
+
+### 31. Plan Triage - Select Urban Area (Presents Detailed Urban Plans)
+# @name planTriageUrbanArea
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Área urbana (dentro da cidade)"
+}
+
+### 32. Temporal Awareness - Attendance Inquiry for Today ("hoje")
+# @name temporalAttendanceToday
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "tem atendimento presencial hoje?"
+}
+
+### 33. Temporal Awareness - Routine Attendance Inquiry for Sundays ("aos domingos")
+# @name temporalAttendanceSundays
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "atende aos domingos?"
+}
+
+### 34. Temporal Awareness - Attendance Inquiry for Tomorrow ("amanhã")
+# @name temporalAttendanceTomorrow
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "amanhã tem atendimento presencial?"
+}
+
+### 35. Operator Action - Suspend Internet Connection
+# @name operatorSuspendInternet
+POST {{BASE_URL}}/api/chat/operator-action
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "action": "suspend_internet",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 36. Operator Action - Check Optical Signal Telemetry
+# @name operatorCheckSignal
+POST {{BASE_URL}}/api/chat/operator-action
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "action": "check_signal",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 37. Operator Action - Reboot Remote Customer ONU (TR-069)
+# @name operatorRebootOnu
+POST {{BASE_URL}}/api/chat/operator-action
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "action": "reboot_onu",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 38. Operator Action - Consult Internal Invoices Summary
+# @name operatorViewInvoices
+POST {{BASE_URL}}/api/chat/operator-action
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "action": "view_invoices",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 39. Operator Action - Reactivate Internet Connection
+# @name operatorActivateInternet
+POST {{BASE_URL}}/api/chat/operator-action
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "action": "activate_internet",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 40. Operator Action - Save Confidential Internal Note
+# @name operatorInternalNote
+POST {{BASE_URL}}/api/chat/operator-action
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "action": "internal_note",
+    "noteText": "Cliente solicitou reativação preventiva para envio de comprovante bancário até o final do dia.",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 41. Operator History - Includes Confidential Internal Messages
+# @name operatorGetHistory
+GET {{BASE_URL}}/api/chat/history?customerId={{CUSTOMER_REF}}&scope=operator
+Accept: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+### 42. Client History - Confidential Internal Messages are Strictly Filtered Out
+# @name clientGetHistory
+GET {{BASE_URL}}/api/chat/history?customerId={{CUSTOMER_REF}}&scope=client
+Accept: application/json
+
+
+
+
+
 
 

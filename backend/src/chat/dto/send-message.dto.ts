@@ -16,4 +16,8 @@ export class SendMessageDto {
     @IsOptional()
     @IsString()
     public model?: string;
+
+    @IsOptional()
+    @IsString()
+    public scope?: string;
 }

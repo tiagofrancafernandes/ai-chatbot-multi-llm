@@ -7,6 +7,7 @@ import { IntentAnalysisResult, IntentContext } from '../llm/interfaces/llm-provi
 import { FlowDefinition, FlowNode } from '../common/interfaces/flow.interface';
 import { Contract, CustomerRegistrationData } from '../common/interfaces/contract.interface';
 import { Plan } from '../common/interfaces/plan.interface';
+import { TemporalResolver } from '../common/utils/temporal-resolver.util';
 
 export interface ProcessMessageParams {
     text: string;
@@ -56,16 +57,42 @@ export class FlowEngineService {
         const lastBotMessage =
             previousBotMessages.length > 0 ? previousBotMessages[previousBotMessages.length - 1].text : undefined;
 
+        const temporalInfo = TemporalResolver.getCurrentTemporalContext(this.databaseService.getBusinessHours());
+
         const intentContext: IntentContext = {
             previousBotMessage: lastBotMessage,
             hasPendingAction: Boolean(session.pendingAction),
             pendingActionType: session.pendingAction?.type,
             customerPlan: customer.plan,
             knowledgeContext: knowledgeBase.cachedSummary,
+            temporalContext: temporalInfo.summaryPrompt,
         };
 
         // Step 1: Execute AI Intent Decision Node with Context
         const analysis = await this.llmService.analyzeIntent(text, providerId, modelOverride, intentContext);
+
+        const lowerText = (text || '').toLowerCase().trim();
+        const isAreaChoice =
+            lowerText.includes('área rural') ||
+            lowerText.includes('area rural') ||
+            lowerText.includes('zona rural') ||
+            lowerText.includes('área urbana') ||
+            lowerText.includes('area urbana') ||
+            lowerText.includes('zona urbana') ||
+            lowerText.includes('dentro da cidade') ||
+            lowerText.includes('na cidade') ||
+            lowerText.includes('sítio / arredores') ||
+            lowerText.includes('sitio / arredores') ||
+            lowerText.includes('planos rurais') ||
+            lowerText.includes('planos urbanos');
+
+        if (isAreaChoice) {
+            analysis.primaryIntent = 'plan_pricing';
+        }
+
+        if (!isAreaChoice && this.isKnowledgeQuery(text)) {
+            analysis.primaryIntent = 'knowledge_inquiry';
+        }
 
         session.currentIntent = analysis.primaryIntent;
         session.secondaryRequest = analysis.secondaryRequest;
@@ -87,7 +114,7 @@ export class FlowEngineService {
         }
 
         // Step 3: Handle Knowledge Inquiries (Rules, physical address, business hours, exceptions)
-        if (analysis.primaryIntent === 'knowledge_inquiry' || this.isKnowledgeQuery(text)) {
+        if (!isAreaChoice && (analysis.primaryIntent === 'knowledge_inquiry' || this.isKnowledgeQuery(text))) {
             const knowledgeOutcome = await this.handleKnowledgeInquiry(text, analysis, customer, session);
 
             return this.finalizeStep(
@@ -173,6 +200,42 @@ export class FlowEngineService {
             return false;
         }
 
+        const isPlanOrAreaSelection =
+            lower.includes('plano') ||
+            lower.includes('planos') ||
+            lower.includes('assinar') ||
+            lower.includes('contratar') ||
+            lower.includes('mudar') ||
+            lower.includes('trocar') ||
+            lower.includes('minha área') ||
+            lower.includes('minha area') ||
+            lower.includes('dentro da cidade') ||
+            lower.includes('sítio / arredores') ||
+            lower.includes('sitio / arredores') ||
+            lower.includes('área urbana') ||
+            lower.includes('area urbana') ||
+            lower.includes('área rural') ||
+            lower.includes('area rural') ||
+            lower.includes('zona rural') ||
+            lower.includes('zona urbana') ||
+            lower.includes('planos rurais') ||
+            lower.includes('planos urbanos');
+
+        if (isPlanOrAreaSelection) {
+            return false;
+        }
+
+        const isCoverageQuery =
+            lower.includes('cobertura') ||
+            lower.includes('área de cobertura') ||
+            lower.includes('area de cobertura') ||
+            lower.includes('área atendida') ||
+            lower.includes('area atendida') ||
+            lower.includes('atendem em') ||
+            lower.includes('atende em') ||
+            lower.includes('atendem na') ||
+            lower.includes('atende na');
+
         return (
             lower.includes('onde fica') ||
             lower.includes('qual o endereço') ||
@@ -197,24 +260,29 @@ export class FlowEngineService {
             lower.includes('abre hoje') ||
             lower.includes('aberto hoje') ||
             lower.includes('funciona hoje') ||
+            lower.includes('atende hoje') ||
+            lower.includes('atendem hoje') ||
+            lower.includes('atende amanhã') ||
+            lower.includes('atende amanha') ||
+            lower.includes('abre amanhã') ||
+            lower.includes('abre amanha') ||
+            lower.includes('atende aos domingos') ||
+            lower.includes('atendem aos domingos') ||
+            lower.includes('atende domingo') ||
+            lower.includes('atendem domingo') ||
+            lower.includes('abre domingo') ||
+            lower.includes('abrem domingo') ||
+            lower.includes('abre aos domingos') ||
+            lower.includes('abrem aos domingos') ||
+            lower.includes('domingo') ||
+            lower.includes('domingos') ||
             lower.includes('quarta-feira') ||
             lower.includes('quarta feira') ||
             lower.includes('sábado') ||
             lower.includes('sabado') ||
             lower.includes('cajuru') ||
             lower.includes('salgados') ||
-            lower.includes('cobertura') ||
-            lower.includes('área de cobertura') ||
-            lower.includes('area de cobertura') ||
-            lower.includes('área atendida') ||
-            lower.includes('area atendida') ||
-            lower.includes('atendem em') ||
-            lower.includes('atende em') ||
-            lower.includes('atendem na') ||
-            lower.includes('atende na') ||
-            lower.includes('zona rural') ||
-            lower.includes('área rural') ||
-            lower.includes('area rural') ||
+            isCoverageQuery ||
             lower.includes('mesh') ||
             lower.includes('roteador') ||
             lower.includes('link dedicado') ||
@@ -231,7 +299,41 @@ export class FlowEngineService {
         );
     }
 
-    private formatPlansMessage(plans: Plan[]): string {
+    private detectAreaPreference(text: string): 'urbano' | 'rural' | 'default' {
+        const lower = (text || '').toLowerCase().trim();
+
+        const isRural =
+            lower.includes('rural') ||
+            lower.includes('roça') ||
+            lower.includes('roca') ||
+            lower.includes('sítio') ||
+            lower.includes('sitio') ||
+            lower.includes('chácara') ||
+            lower.includes('chacara') ||
+            lower.includes('fazenda') ||
+            lower.includes('arredores') ||
+            lower.includes('fora da cidade');
+
+        if (isRural) {
+            return 'rural';
+        }
+
+        const isUrban =
+            lower.includes('urbano') ||
+            lower.includes('urbana') ||
+            lower.includes('dentro da cidade') ||
+            lower.includes('na cidade') ||
+            lower.includes('no centro') ||
+            lower.includes('bairro');
+
+        if (isUrban) {
+            return 'urbano';
+        }
+
+        return 'default';
+    }
+
+    private formatPlansMessage(plans: Plan[], areaPreference: 'default' | 'urbano' | 'rural' = 'default'): string {
         const urbanPlans = plans.filter((p) => p.area === 'urbano');
         const ruralPlans = plans.filter((p) => p.area === 'rural');
 
@@ -242,12 +344,94 @@ export class FlowEngineService {
             (p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`
         );
 
+        if (areaPreference === 'rural') {
+            return (
+                `🌾 **Planos de Fibra Óptica para Área Rural (Sítios, Chácaras e Arredores):**\n${ruralLines.join('\n')}\n\n` +
+                `⚠️ *Nota sobre instalação na zona rural: A viabilidade técnica e a taxa de instalação são calculadas sob consulta, de acordo com a distância do seu imóvel até a nossa rede de fibra cabeada.*\n\n` +
+                `🏙️ **Alternativa para Área Urbana:** Também atendemos na cidade com planos a partir de R$ 79,99/mês e instalação 100% grátis.\n\n` +
+                `Qual destes planos rurais você gostaria de contratar?`
+            );
+        }
+
+        if (areaPreference === 'urbano') {
+            return (
+                `🏙️ **Planos de Fibra Óptica para Área Urbana (Carmo do Cajuru e São José dos Salgados):**\n${urbanLines.join('\n')}\n\n` +
+                `🎁 *Instalação 100% grátis em toda a zona urbana!*\n\n` +
+                `🌾 **Alternativa para Área Rural:** Se você estiver em sítio, chácara ou arredores, temos planos a partir de R$ 99,99/mês (taxa de instalação sob consulta).\n\n` +
+                `Qual destes planos urbanos você gostaria de contratar para iniciarmos seu cadastro?`
+            );
+        }
+
         return (
             `Aqui estão nossos planos de internet 100% Fibra Óptica:\n\n` +
-            `🏙️ **Área Urbana (Carmo do Cajuru e São José dos Salgados - Instalação Grátis):**\n${urbanLines.join('\n')}\n\n` +
-            `🌾 **Área Rural (Proximidades - Taxa de instalação sob consulta do ponto):**\n${ruralLines.join('\n')}\n\n` +
-            `💼 *Serviços adicionais: Rede Mesh, Wi-Fi Corporativo e Links Dedicados são à combinar sob análise de necessidade.*`
+            `🏙️ **Planos para Área Urbana (Padrão — Instalação 100% Grátis):**\n${urbanLines.join('\n')}\n\n` +
+            `🌾 **Alternativa para Área Rural (Sítios, Chácaras e Arredores):**\n` +
+            `Para propriedades fora da área urbana, possuímos planos rurais especiais a partir de R$ 99,99/mês (com taxa de instalação sob consulta conforme a distância até a rede cabeada).\n\n` +
+            `📍 **Para prosseguirmos:** O atendimento/instalação será **dentro da cidade (área urbana)** ou **nas áreas ao redor / zona rural**?`
         );
+    }
+
+    private getPlanOptionsByArea(
+        areaPreference: 'default' | 'urbano' | 'rural',
+        isIdentifiedCustomer = false
+    ): string[] {
+        if (areaPreference === 'rural') {
+            if (isIdentifiedCustomer) {
+                return [
+                    'Mudar para Rural 600 Mega (R$ 99,99)',
+                    'Mudar para Rural 800 Mega (R$ 110,99)',
+                    'Mudar para Rural 1 Giga (R$ 120,99)',
+                    'Ver planos urbanos (na cidade)',
+                    'Menu principal',
+                ];
+            }
+
+            return [
+                'Quero Rural 600 Mega (R$ 99,99)',
+                'Quero Rural 800 Mega (R$ 110,99)',
+                'Quero Rural 1 Giga (R$ 120,99)',
+                'Ver planos urbanos (na cidade)',
+                'Consultar taxa de instalação',
+            ];
+        }
+
+        if (areaPreference === 'urbano') {
+            if (isIdentifiedCustomer) {
+                return [
+                    'Quero mudar para o plano mais barato',
+                    'Mudar para Urbano 800 Mega (R$ 89,99)',
+                    'Mudar para Urbano 1 Giga (R$ 99,99)',
+                    'Ver planos para área rural',
+                    'Menu principal',
+                ];
+            }
+
+            return [
+                'Quero Urbano 600 Mega (R$ 79,99)',
+                'Quero Urbano 800 Mega (R$ 89,99)',
+                'Quero Urbano 1 Giga (R$ 99,99)',
+                'Ver planos para área rural',
+                'Consultar cobertura',
+            ];
+        }
+
+        if (isIdentifiedCustomer) {
+            return [
+                'Área urbana (dentro da cidade)',
+                'Área rural (sítio / arredores)',
+                'Quero mudar para o plano mais barato',
+                'Ver planos para área rural',
+                'Menu principal',
+            ];
+        }
+
+        return [
+            'Área urbana (dentro da cidade)',
+            'Área rural (sítio / arredores)',
+            'Quero Urbano 600 Mega (R$ 79,99)',
+            'Quero Urbano 800 Mega (R$ 89,99)',
+            'Ver planos para área rural',
+        ];
     }
 
     private matchTargetPlan(text: string, plans: Plan[], fallbackToFirst = true): Plan | null {
@@ -378,8 +562,28 @@ export class FlowEngineService {
         session: ChatSession
     ): Promise<StepRoutingOutcome> {
         const knowledgeBase = this.databaseService.getKnowledgeBase();
+        const businessHours = this.databaseService.getBusinessHours();
         const summary = knowledgeBase.cachedSummary || knowledgeBase.companyRules;
         const lower = text.toLowerCase().trim();
+
+        // 1. Precise Temporal & Business Hours Query Resolution (Relative dates: hoje, ontem, amanhã, domingos, etc.)
+        const temporalResolution = TemporalResolver.resolveTemporalQuery(
+            text,
+            businessHours,
+            knowledgeBase.additionalInstructions
+        );
+
+        if (temporalResolution.hasTemporalReference && temporalResolution.responseMessage) {
+            const options = customer.isIdentified
+                ? ['Qual é o meu plano atual?', 'Ver todos os planos disponíveis', 'Falar com atendente']
+                : ['Ver planos disponíveis', 'Falar com atendente', 'Menu principal'];
+
+            return {
+                response: temporalResolution.responseMessage,
+                nodeId: 'node_knowledge_inquiry_action',
+                options,
+            };
+        }
 
         let responseText = '';
 
@@ -467,9 +671,10 @@ export class FlowEngineService {
 
         if (!responseText) {
             try {
-                const prompt = `Com base nas informações oficiais da empresa abaixo, responda à dúvida do cliente de forma prestativa, clara e objetiva em português:\n\nInformações do provedor:\n${summary}\n\nPergunta do cliente: "${text}"\n\nResponda em 2 ou 3 frases:`;
+                const temporalInfo = TemporalResolver.getCurrentTemporalContext(businessHours);
+                const prompt = `Com base nas informações oficiais da empresa e na data atual abaixo, responda à dúvida do cliente de forma prestativa, clara e objetiva em português:\n\n${temporalInfo.summaryPrompt}\n\nInformações do provedor:\n${summary}\n\nPergunta do cliente: "${text}"\n\nResponda em 2 ou 3 frases:`;
                 const systemInstruction =
-                    'Você é o assistente virtual do provedor de internet 100% Fibra Óptica em Carmo do Cajuru e São José dos Salgados - MG. Responda diretamente e cordialmente em português brasileiro usando apenas os fatos fornecidos.';
+                    'Você é o assistente virtual do provedor de internet 100% Fibra Óptica em Carmo do Cajuru e São José dos Salgados - MG. Responda diretamente e cordialmente em português brasileiro usando apenas os fatos fornecidos. ATENÇÃO: A loja física para atendimento presencial fecha aos domingos e feriados. O provedor possui planos de fibra óptica para áreas urbanas e rurais.';
 
                 const generated = await this.llmService.generateText(
                     prompt,
@@ -1227,18 +1432,14 @@ export class FlowEngineService {
                 };
             }
 
+            const areaPref = this.detectAreaPreference(text);
             const response =
                 `Seja muito bem-vindo ao nosso atendimento!\n\n` +
-                `${this.formatPlansMessage(plans)}\n\n` +
+                `${this.formatPlansMessage(plans, areaPref)}\n\n` +
                 `Qual destes planos você gostaria de contratar para iniciarmos seu cadastro?\n\n` +
                 `*(Se preferir, você também já pode nos enviar seus dados: Nome completo, CPF, E-mail, Telefone com DDD e Endereço completo com cidade/distrito!)*`;
 
-            const options = [
-                'Quero Urbano 600 Mega (R$ 79,99)',
-                'Quero Urbano 800 Mega (R$ 89,99)',
-                'Quero Rural 600 Mega (R$ 99,99)',
-                'Consultar cobertura / viabilidade',
-            ];
+            const options = this.getPlanOptionsByArea(areaPref, false);
 
             return {
                 isHandled: true,
@@ -1255,21 +1456,17 @@ export class FlowEngineService {
             const matchedPlan = this.matchTargetPlan(text, plans, false);
 
             if (!matchedPlan) {
+                const areaPref = this.detectAreaPreference(text);
                 const response =
                     `Excelente! Ficamos felizes com seu interesse em assinar nossa internet 100% Fibra Óptica.\n\n` +
-                    `${this.formatPlansMessage(plans)}\n\n` +
+                    `${this.formatPlansMessage(plans, areaPref)}\n\n` +
                     `Qual destes planos você gostaria de contratar para iniciarmos seu cadastro?`;
 
-                const options = [
-                    'Quero Urbano 600 Mega (R$ 79,99)',
-                    'Quero Urbano 800 Mega (R$ 89,99)',
-                    'Quero Rural 600 Mega (R$ 99,99)',
-                    'Consultar cobertura / viabilidade',
-                ];
+                const options = this.getPlanOptionsByArea(areaPref, false);
 
                 session.pendingAction = {
                     type: 'new_subscription',
-                    targetPlan: plans[0]?.name || 'Urbano 600 Mega',
+                    targetPlan: areaPref === 'rural' ? 'Rural 600 Mega' : 'Urbano 600 Mega',
                     registrationData: {},
                     description: 'Contratação de assinatura',
                     createdAt: Date.now(),
@@ -1341,18 +1538,29 @@ export class FlowEngineService {
             };
         }
 
-        // 4. Plan Pricing Inquiries
-        if (analysis.primaryIntent === 'plan_pricing') {
+        const isAreaChoice =
+            lowerText.includes('área rural') ||
+            lowerText.includes('area rural') ||
+            lowerText.includes('zona rural') ||
+            lowerText.includes('área urbana') ||
+            lowerText.includes('area urbana') ||
+            lowerText.includes('zona urbana') ||
+            lowerText.includes('dentro da cidade') ||
+            lowerText.includes('na cidade') ||
+            lowerText.includes('sítio') ||
+            lowerText.includes('sitio') ||
+            lowerText.includes('arredores') ||
+            lowerText.includes('planos rurais') ||
+            lowerText.includes('planos urbanos') ||
+            lowerText.includes('ver planos');
+
+        // 4. Plan Pricing Inquiries & Area Selection
+        if (analysis.primaryIntent === 'plan_pricing' || isAreaChoice) {
             const pricingNode = this.findNode(flow, 'node_plan_pricing_action');
             const plans = this.databaseService.getPlans();
-            const response = `${this.formatPlansMessage(plans)}\n\nQual plano você gostaria de assinar? Ou, se já for cliente, informe seu telefone ou CPF para acessar sua conta!`;
-            const options = [
-                'Quero Urbano 600 Mega (R$ 79,99)',
-                'Quero Urbano 800 Mega (R$ 89,99)',
-                'Quero Rural 600 Mega (R$ 99,99)',
-                'Consultar cobertura / viabilidade',
-                'Já sou cliente (informar telefone)',
-            ];
+            const areaPref = this.detectAreaPreference(text);
+            const response = `${this.formatPlansMessage(plans, areaPref)}\n\nQual plano você gostaria de assinar? Ou, se já for cliente, informe seu telefone ou CPF para acessar sua conta!`;
+            const options = this.getPlanOptionsByArea(areaPref, false);
 
             return {
                 isHandled: true,
@@ -1545,7 +1753,7 @@ export class FlowEngineService {
                 (lowerText.includes('barato') || lowerText.includes('starter') || lowerText.includes('pro')));
 
         if (isPlanChangeIntent) {
-            return this.handlePlanChangeRequest(analysis, customer, session, plans, lowerText);
+            return this.handlePlanChangeRequest(analysis, customer, session, plans, text, lowerText);
         }
 
         // 4. Customer Profile Data Query / Identifier Confirmation
@@ -1849,14 +2057,31 @@ export class FlowEngineService {
             return { response, nodeId: 'node_greeting_message', options };
         }
 
-        // 6. Plan Pricing Inquiries
-        if (analysis.primaryIntent === 'plan_pricing') {
+        const isAreaChoice =
+            lowerText.includes('área rural') ||
+            lowerText.includes('area rural') ||
+            lowerText.includes('zona rural') ||
+            lowerText.includes('área urbana') ||
+            lowerText.includes('area urbana') ||
+            lowerText.includes('zona urbana') ||
+            lowerText.includes('dentro da cidade') ||
+            lowerText.includes('na cidade') ||
+            lowerText.includes('sítio') ||
+            lowerText.includes('sitio') ||
+            lowerText.includes('arredores') ||
+            lowerText.includes('planos rurais') ||
+            lowerText.includes('planos urbanos') ||
+            lowerText.includes('ver planos');
+
+        // 6. Plan Pricing Inquiries & Area Selection
+        if (analysis.primaryIntent === 'plan_pricing' || isAreaChoice) {
             const currentPlanNotice = customer.plan
                 ? `Seu plano atual é **"${customer.plan}"**.`
                 : 'Você ainda não possui um plano ativo.';
 
-            const response = `${currentPlanNotice}\n\n${this.formatPlansMessage(plans as Plan[])}\n\nDeseja mudar de plano ou verificar opções mais econômicas?`;
-            const options = ['Quero mudar para o plano mais barato', 'Ver minhas faturas', 'Menu principal'];
+            const areaPref = this.detectAreaPreference(text);
+            const response = `${currentPlanNotice}\n\n${this.formatPlansMessage(plans as Plan[], areaPref)}\n\nDeseja mudar de plano ou verificar opções mais econômicas?`;
+            const options = this.getPlanOptionsByArea(areaPref, true);
 
             return { response, nodeId: 'node_plan_pricing_action', options };
         }
@@ -1923,7 +2148,8 @@ export class FlowEngineService {
         analysis: IntentAnalysisResult,
         customer: Customer,
         session: ChatSession,
-        plans: Array<{ id: string; name: string; price: number; features: string[] }>,
+        plans: Plan[],
+        rawText = '',
         lowerText = ''
     ): StepRoutingOutcome {
         // 1. Identify specific target plan first from user text or analysis
@@ -2010,11 +2236,9 @@ export class FlowEngineService {
             analysis.primaryIntent === 'plan_change';
 
         if (userAskedToChangePlan) {
-            const planList = plans
-                .map((p) => `• **${p.name}**: R$ ${p.price.toFixed(2)}/mês (${p.features.join(', ')})`)
-                .join('\n');
-            const response = `Para qual dos planos abaixo você gostaria de alterar sua assinatura?\n\n${planList}`;
-            const options = plans.map((p) => `Mudar para ${p.name}`);
+            const areaPref = this.detectAreaPreference(rawText || lowerText);
+            const response = `Para qual dos planos você gostaria de alterar sua assinatura?\n\n${this.formatPlansMessage(plans, areaPref)}`;
+            const options = this.getPlanOptionsByArea(areaPref, true);
 
             return { response, nodeId: 'node_plan_pricing_action', options };
         }

@@ -13,6 +13,14 @@ export interface Customer {
     email?: string;
     plan?: string;
     notes?: string;
+    connectionStatus?: 'active' | 'suspended' | 'blocked';
+    opticalSignal?: {
+        rxPowerDbm: number;
+        txPowerDbm: number;
+        ponStatus: 'operational' | 'degraded' | 'offline';
+        lastOnlineAt: string;
+        onuMac?: string;
+    };
     invoices: Invoice[];
     isIdentified: boolean;
     metadata?: Record<string, unknown>;
@@ -75,6 +83,8 @@ export interface ChatMessage {
     provider?: string;
     model?: string;
     options?: string[];
+    isInternal?: boolean;
+    internalCategory?: 'operator_note' | 'action_confirmation' | 'telemetry_status' | 'financial_summary';
     metadata?: Record<string, unknown>;
 }
 
@@ -131,4 +141,11 @@ export interface KnowledgeBaseData {
     additionalInstructions: string;
     cachedSummary: string;
     lastCompiledAt: number;
+}
+
+export interface ChatSessionSummary {
+    session: ChatSession;
+    customer: Customer;
+    lastMessage?: ChatMessage;
+    messageCount: number;
 }

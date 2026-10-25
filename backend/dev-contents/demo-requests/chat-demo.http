@@ -226,4 +226,147 @@ Content-Type: {{contentType}}
     "text": "Simular assinatura do contrato"
 }
 
+### 26. Operator Console - List All Active Chat Sessions
+# @name listChatSessions
+GET {{baseUrl}}/chat/sessions
+
+### 27. Plan Triage - Default Plans Inquiry (Urban as Default, Rural as Alternative & Asks Area)
+# @name planTriageDefault
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_plan_demo",
+    "text": "Quero ver os planos de internet fibra"
+}
+
+### 28. Plan Triage - Select Rural Area (Presents Detailed Rural Plans & Distances)
+# @name planTriageRuralArea
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_plan_demo",
+    "text": "Área rural (sítio / arredores)"
+}
+
+### 29. Plan Triage - Select Urban Area (Presents Detailed Urban Plans)
+# @name planTriageUrbanArea
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_plan_demo",
+    "text": "Área urbana (dentro da cidade)"
+}
+
+### 30. Temporal Awareness - Attendance Inquiry for Today ("hoje")
+# @name temporalAttendanceToday
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "tem atendimento presencial hoje?"
+}
+
+### 31. Temporal Awareness - Routine Attendance Inquiry for Sundays ("aos domingos")
+# @name temporalAttendanceSundays
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "atende aos domingos?"
+}
+
+### 32. Temporal Awareness - Attendance Inquiry for Tomorrow ("amanhã")
+# @name temporalAttendanceTomorrow
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_temporal_demo",
+    "text": "amanhã tem atendimento presencial?"
+}
+
+### 33. Operator Action - Suspend Internet Connection
+# @name operatorSuspendInternet
+POST {{baseUrl}}/chat/operator-action
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "action": "suspend_internet",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 34. Operator Action - Check Optical Signal Telemetry
+# @name operatorCheckSignal
+POST {{baseUrl}}/chat/operator-action
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "action": "check_signal",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 35. Operator Action - Reboot Remote Customer ONU (TR-069)
+# @name operatorRebootOnu
+POST {{baseUrl}}/chat/operator-action
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "action": "reboot_onu",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 36. Operator Action - Consult Internal Invoices Summary
+# @name operatorViewInvoices
+POST {{baseUrl}}/chat/operator-action
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "action": "view_invoices",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 37. Operator Action - Reactivate Internet Connection
+# @name operatorActivateInternet
+POST {{baseUrl}}/chat/operator-action
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "action": "activate_internet",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 38. Operator Action - Save Confidential Internal Note
+# @name operatorInternalNote
+POST {{baseUrl}}/chat/operator-action
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "action": "internal_note",
+    "noteText": "Cliente solicitou reativação preventiva para envio de comprovante bancário até o final do dia.",
+    "operatorName": "Mariana Silva (Suporte N2)"
+}
+
+### 39. Operator History - Includes Confidential Internal Messages
+# @name operatorGetHistory
+GET {{baseUrl}}/chat/history?customerId=5511999999999&scope=operator
+
+### 40. Client History - Confidential Internal Messages are Strictly Filtered Out
+# @name clientGetHistory
+GET {{baseUrl}}/chat/history?customerId=5511999999999&scope=client
+
+
+
+
+
 

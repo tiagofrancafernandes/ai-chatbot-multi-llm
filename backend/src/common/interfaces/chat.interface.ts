@@ -25,6 +25,8 @@ export interface ChatMessage {
     provider?: string;
     model?: string;
     options?: string[];
+    isInternal?: boolean;
+    internalCategory?: 'operator_note' | 'action_confirmation' | 'telemetry_status' | 'financial_summary';
     metadata?: Record<string, unknown>;
 }
 

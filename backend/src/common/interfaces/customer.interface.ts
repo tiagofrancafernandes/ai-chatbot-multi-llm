@@ -13,6 +13,14 @@ export interface Customer {
     email?: string;
     plan?: string;
     notes?: string;
+    connectionStatus?: 'active' | 'suspended' | 'blocked';
+    opticalSignal?: {
+        rxPowerDbm: number;
+        txPowerDbm: number;
+        ponStatus: 'operational' | 'degraded' | 'offline';
+        lastOnlineAt: string;
+        onuMac?: string;
+    };
     invoices: Invoice[];
     isIdentified: boolean;
     metadata?: Record<string, unknown>;

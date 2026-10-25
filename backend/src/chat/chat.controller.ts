@@ -6,6 +6,7 @@ import { SwitchProviderDto } from './dto/switch-provider.dto';
 import { TransferAttendanceDto } from './dto/transfer-attendance.dto';
 import { AgentMessageDto } from './dto/agent-message.dto';
 import { ResumeAiDto } from './dto/resume-ai.dto';
+import { OperatorActionDto } from './dto/operator-action.dto';
 
 @Controller('api/chat')
 export class ChatController {
@@ -24,8 +25,19 @@ export class ChatController {
     }
 
     @Get('history')
-    public getHistory(@Query('customerId') customerId: string) {
-        return this.chatService.getHistory(customerId);
+    public getHistory(@Query('customerId') customerId: string, @Query('scope') scope?: string) {
+        return this.chatService.getHistory(customerId, scope);
+    }
+
+    @Post('operator-action')
+    @HttpCode(HttpStatus.OK)
+    public executeOperatorAction(@Body() dto: OperatorActionDto) {
+        return this.chatService.executeOperatorAction(dto);
+    }
+
+    @Get('sessions')
+    public getSessions() {
+        return this.chatService.getAllSessions();
     }
 
     @Post('reset')

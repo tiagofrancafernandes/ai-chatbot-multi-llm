@@ -24,6 +24,7 @@ export interface IntentContext {
     pendingActionType?: string;
     customerPlan?: string;
     knowledgeContext?: string;
+    temporalContext?: string;
 }
 
 export interface IntentAnalysisResult {

@@ -7,6 +7,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { TransferAttendanceDto } from './dto/transfer-attendance.dto';
 import { AgentMessageDto } from './dto/agent-message.dto';
 import { ResumeAiDto } from './dto/resume-ai.dto';
+import { OperatorActionDto } from './dto/operator-action.dto';
 import { Customer } from '../common/interfaces/customer.interface';
 import { ChatSession, ChatMessage } from '../common/interfaces/chat.interface';
 import { AttendanceInfo, HumanAgent, AttendanceDepartment } from '../common/interfaces/attendance.interface';
@@ -75,8 +76,16 @@ export class ChatService {
         const activeProvider = this.llmService.getActiveProviderId();
         const activeModel = this.llmService.getActiveModel();
 
+        const isOperatorScope = dto.scope === 'operator';
+        const returnedSession = isOperatorScope
+            ? session
+            : {
+                  ...session,
+                  messages: session.messages.filter((m) => !m.isInternal),
+              };
+
         return {
-            session,
+            session: returnedSession,
             customer,
             activeProvider,
             activeModel,
@@ -202,8 +211,16 @@ export class ChatService {
                     ? `Sua mensagem foi enviada para a fila de **${assignedName}** (Posição: ${attendance.queue?.position || 1}). O atendimento automatizado por IA está pausado.`
                     : `Sua mensagem foi entregue para o atendente **${assignedName}**. O atendimento automatizado por IA está pausado.`;
 
+            const isOperatorScope = dto.scope === 'operator';
+            const returnedSession = isOperatorScope
+                ? session
+                : {
+                      ...session,
+                      messages: session.messages.filter((m) => !m.isInternal),
+                  };
+
             return {
-                session,
+                session: returnedSession,
                 customer,
                 botResponse: waitNotice,
                 analysis: {
@@ -235,8 +252,16 @@ export class ChatService {
             modelOverride: dto.model,
         });
 
+        const isOperatorScope = dto.scope === 'operator';
+        const returnedSession = isOperatorScope
+            ? flowResult.session
+            : {
+                  ...flowResult.session,
+                  messages: flowResult.session.messages.filter((m) => !m.isInternal),
+              };
+
         return {
-            session: flowResult.session,
+            session: returnedSession,
             customer: flowResult.customer,
             botResponse: flowResult.botResponse,
             analysis: flowResult.analysis,
@@ -364,12 +389,16 @@ export class ChatService {
             pausedAt: session.attendance?.pausedAt || now,
         };
 
+        const isInternal = Boolean(dto.isInternal);
+
         const agentMsg: ChatMessage = {
             id: `msg_agent_${now}`,
             sender: 'agent',
             agentName,
             text: dto.text.trim(),
             timestamp: now,
+            isInternal,
+            internalCategory: isInternal ? 'operator_note' : undefined,
         };
 
         session.messages.push(agentMsg);
@@ -446,7 +475,7 @@ export class ChatService {
         }
     }
 
-    public getHistory(customerId: string): ChatSession {
+    public getHistory(customerId: string, scope?: string): ChatSession {
         if (!customerId) {
             throw new BadRequestException('customerId query parameter is required');
         }
@@ -457,7 +486,167 @@ export class ChatService {
             throw new NotFoundException(`No chat session found for customerId: ${customerId}`);
         }
 
-        return session;
+        if (scope === 'operator') {
+            return session;
+        }
+
+        return {
+            ...session,
+            messages: session.messages.filter((m) => !m.isInternal),
+        };
+    }
+
+    public executeOperatorAction(dto: OperatorActionDto): {
+        session: ChatSession;
+        customer: Customer;
+        message: string;
+        actionResult: Record<string, unknown>;
+    } {
+        if (!dto.customerId) {
+            throw new BadRequestException('customerId is required');
+        }
+
+        let customer = this.databaseService.findCustomerById(dto.customerId);
+        if (!customer) {
+            customer = {
+                id: dto.customerId,
+                invoices: [],
+                isIdentified: false,
+                connectionStatus: 'active',
+            };
+            this.databaseService.saveCustomer(customer);
+        }
+
+        let session = this.databaseService.findSessionByCustomerId(dto.customerId);
+        if (!session) {
+            session = {
+                id: `sess_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                customerId: customer.id,
+                messages: [],
+                activeNodeId: 'node_intent_decision',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+        }
+
+        this.ensureSessionAttendance(session);
+
+        const now = Date.now();
+        const operatorName = dto.operatorName || session.attendance?.assignedTo.name || 'Suporte Técnico';
+        let actionResult: Record<string, unknown> = {};
+        let internalText = '';
+        let internalCategory: 'operator_note' | 'action_confirmation' | 'telemetry_status' | 'financial_summary' =
+            'action_confirmation';
+        let feedbackMessage = '';
+
+        if (dto.action === 'suspend_internet') {
+            customer.connectionStatus = 'suspended';
+            this.databaseService.saveCustomer(customer);
+            actionResult = { status: 'suspended', timestamp: now };
+            feedbackMessage = 'Fornecimento de internet suspenso com sucesso';
+            internalCategory = 'action_confirmation';
+            internalText = `🔒 **[Ação do Atendente] Suspensão do Fornecimento de Internet**\n\n• **Status da Conexão:** 🔴 SUSPENSO administrativamente.\n• **Operador:** ${operatorName}\n• **Horário:** ${new Date(now).toLocaleTimeString('pt-BR')}\n• **Ação técnica:** Bloqueio de porta e rota aplicado no concentrador PPPoE/RADIUS.\n\n*(Esta notificação é confidencial e não é visível ao cliente).*`;
+        }
+
+        if (dto.action === 'activate_internet') {
+            customer.connectionStatus = 'active';
+            this.databaseService.saveCustomer(customer);
+            actionResult = { status: 'active', timestamp: now };
+            feedbackMessage = 'Fornecimento de internet reativado com sucesso';
+            internalCategory = 'action_confirmation';
+            internalText = `🔒 **[Ação do Atendente] Reativação do Fornecimento de Internet**\n\n• **Status da Conexão:** 🟢 ATIVO e liberado com sucesso.\n• **Operador:** ${operatorName}\n• **Horário:** ${new Date(now).toLocaleTimeString('pt-BR')}\n• **Provisionamento:** Rota 100% fibra operacional e autenticada na OLT.\n\n*(Esta notificação é confidencial e não é visível ao cliente).*`;
+        }
+
+        if (dto.action === 'check_signal') {
+            const isSuspended = customer.connectionStatus === 'suspended';
+            const signalData = {
+                rxPowerDbm: -19.4,
+                txPowerDbm: 2.8,
+                ponStatus: isSuspended ? 'degraded' : 'operational',
+                lastOnlineAt: new Date(now).toISOString(),
+                onuMac: customer.opticalSignal?.onuMac || 'E4:8D:8C:3B:11:F2',
+                oltPort: 'Porta PON 03 - Splitter Central Cajuru',
+                attenuation: '1.2 dB (Excelente)',
+                packetLoss: '0.0%',
+                latencyMs: 3.8,
+                uptime: '14 dias, 6 horas e 22 min',
+            };
+            customer.opticalSignal = {
+                rxPowerDbm: signalData.rxPowerDbm,
+                txPowerDbm: signalData.txPowerDbm,
+                ponStatus: signalData.ponStatus as 'operational' | 'degraded' | 'offline',
+                lastOnlineAt: signalData.lastOnlineAt,
+                onuMac: signalData.onuMac,
+            };
+            this.databaseService.saveCustomer(customer);
+            actionResult = signalData;
+            feedbackMessage = 'Sinal óptico verificado com sucesso';
+            internalCategory = 'telemetry_status';
+            internalText = `📊 **[Diagnóstico Técnico Interno] Telemetria de Sinal Óptico**\n\n• **Potência RX (Recepção na ONU):** \`-19.4 dBm\` (Excelente — Faixa recomendada: -15 a -24 dBm)\n• **Potência TX (Transmissão):** \`+2.8 dBm\` (Normal)\n• **Status PON:** ${isSuspended ? '⚠️ Degradado / Bloqueado administrativamente' : '🟢 Operacional (OLT Carmo do Cajuru - Porta 3)'}\n• **MAC da ONU/Roteador:** \`${signalData.onuMac}\`\n• **Perda de Pacotes:** \`0.0%\` | **Latência Gateway:** \`3.8 ms\`\n• **Uptime da ONU:** 14 dias e 6 horas\n• **Status Conexão:** ${isSuspended ? '🔴 Suspensa' : '🟢 Ativa'}\n\n*(Telemetria técnica gerada para análise do operador antes de responder).*`;
+        }
+
+        if (dto.action === 'reboot_onu') {
+            actionResult = { rebootSent: true, protocol: 'TR-069', targetMac: 'E4:8D:8C:3B:11:F2', timestamp: now };
+            feedbackMessage = 'Comando de reinicialização remota enviado à ONU';
+            internalCategory = 'action_confirmation';
+            internalText = `⚡ **[Comando Remoto] Reinicialização de ONU / Roteador (TR-069)**\n\n• **Comando enviado:** Reboot remoto enviado com sucesso para o MAC \`E4:8D:8C:3B:11:F2\`.\n• **Tempo de convergência:** ~60 segundos para restabelecimento da sessão PPPoE.\n• **Operador responsável:** ${operatorName}\n\n*(Ação interna registrada nos logs do sistema).*`;
+        }
+
+        if (dto.action === 'view_invoices') {
+            const invoices = customer.invoices || [];
+            const pending = invoices.filter((i) => i.status === 'pending');
+            const listStr =
+                invoices.length > 0
+                    ? invoices
+                          .map(
+                              (inv) =>
+                                  `• **Fatura \`${inv.id}\`:** R$ ${inv.amount.toFixed(2)} — Venc: \`${inv.dueDate}\` [${inv.status === 'paid' ? '🟢 PAGA' : '🔴 PENDENTE'}]`
+                          )
+                          .join('\n')
+                    : '• Nenhuma fatura registrada no banco de dados.';
+
+            actionResult = { totalInvoices: invoices.length, pendingInvoices: pending.length };
+            feedbackMessage = 'Extrato financeiro interno consultado';
+            internalCategory = 'financial_summary';
+            internalText = `📑 **[Extrato Financeiro Interno] Consulta de Faturas e Débitos**\n\n👤 **Titular:** **${customer.name || 'Visitante'}** (\`${customer.id}\`)\n📦 **Plano Ativo:** **${customer.plan || 'Sem plano'}**\n\n${listStr}\n\n• **Situação Cadastral:** ${pending.length === 0 ? '🟢 Em dia (Nenhuma pendência)' : `🔴 Inadimplente (${pending.length} fatura(s) pendente(s))`}\n• **Fornecimento:** ${customer.connectionStatus === 'suspended' ? '🔴 Suspenso' : '🟢 Ativo'}\n\n*(Dados confidenciais para apoio na negociação e suporte).*`;
+        }
+
+        if (dto.action === 'unlock_promise') {
+            customer.connectionStatus = 'active';
+            this.databaseService.saveCustomer(customer);
+            actionResult = { unlocked: true, expiryHours: 48, timestamp: now };
+            feedbackMessage = 'Desbloqueio em confiança de 48 horas concedido';
+            internalCategory = 'action_confirmation';
+            internalText = `🤝 **[Liberação em Confiança] Desbloqueio Temporário Concedido (48h)**\n\n• **Status da Conexão:** 🟢 Provisoriamente Ativo por 48 horas.\n• **Operador:** ${operatorName}\n• **Motivo:** Promessa de pagamento registrada pelo suporte.\n• **Prazo limite:** Compensação bancária até ${new Date(now + 48 * 3600 * 1000).toLocaleDateString('pt-BR')}.\n\n*(Registro interno de conformidade).*`;
+        }
+
+        if (dto.action === 'internal_note') {
+            actionResult = { note: dto.noteText, timestamp: now };
+            feedbackMessage = 'Nota interna adicionada com sucesso';
+            internalCategory = 'operator_note';
+            internalText = `📝 **[Nota Interna do Atendente]**\n\n"${dto.noteText || 'Nota registrada pelo operador.'}"\n\n👤 **Autor:** ${operatorName} às ${new Date(now).toLocaleTimeString('pt-BR')}\n\n*(Esta mensagem é estritamente interna e não é exibida ao cliente).*`;
+        }
+
+        const internalMsg: ChatMessage = {
+            id: `msg_internal_${now}`,
+            sender: 'system',
+            agentName: operatorName,
+            text: internalText,
+            timestamp: now,
+            isInternal: true,
+            internalCategory,
+        };
+
+        session.messages.push(internalMsg);
+        session.updatedAt = now;
+        this.databaseService.saveSession(session);
+
+        return {
+            session,
+            customer,
+            message: feedbackMessage,
+            actionResult,
+        };
     }
 
     public resetSession(customerId: string): { success: boolean; newCustomerId: string } {
@@ -541,5 +730,46 @@ export class ChatService {
             success: true,
             contract,
         };
+    }
+
+    public getAllSessions(): Array<{
+        session: ChatSession;
+        customer: Customer;
+        lastMessage?: ChatMessage;
+        messageCount: number;
+    }> {
+        const rawSessions = this.databaseService.getSessions() || [];
+        const result: Array<{
+            session: ChatSession;
+            customer: Customer;
+            lastMessage?: ChatMessage;
+            messageCount: number;
+        }> = [];
+
+        for (const session of rawSessions) {
+            this.ensureSessionAttendance(session);
+            const customer = this.databaseService.findCustomerById(session.customerId) || {
+                id: session.customerId,
+                name: 'Visitante',
+                invoices: [],
+                isIdentified: false,
+            };
+
+            const lastMessage =
+                session.messages && session.messages.length > 0
+                    ? session.messages[session.messages.length - 1]
+                    : undefined;
+
+            result.push({
+                session,
+                customer,
+                lastMessage,
+                messageCount: session.messages?.length || 0,
+            });
+        }
+
+        result.sort((a, b) => (b.session.updatedAt || 0) - (a.session.updatedAt || 0));
+
+        return result;
     }
 }

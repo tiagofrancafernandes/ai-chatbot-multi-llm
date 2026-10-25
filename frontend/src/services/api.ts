@@ -5,16 +5,27 @@ import {
     Customer,
     ProviderInfo,
     KnowledgeBaseData,
+    ChatSessionSummary,
 } from '../types/chat';
 
 const API_BASE = '/api';
 
 export class ApiService {
-    public static async initChat(customerId?: string): Promise<InitChatResponse> {
+    public static async initChat(
+        customerId?: string,
+        providerId?: string,
+        model?: string,
+        scope?: 'client' | 'operator'
+    ): Promise<InitChatResponse> {
         const response = await fetch(`${API_BASE}/chat/init`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerId }),
+            body: JSON.stringify({
+                customerId,
+                providerId,
+                model,
+                scope,
+            }),
         });
 
         if (!response.ok) {
@@ -28,7 +39,8 @@ export class ApiService {
         customerId: string,
         text: string,
         providerId?: string,
-        model?: string
+        model?: string,
+        scope?: 'client' | 'operator'
     ): Promise<SendMessageResponse> {
         const response = await fetch(`${API_BASE}/chat/message`, {
             method: 'POST',
@@ -38,6 +50,7 @@ export class ApiService {
                 text,
                 providerId,
                 model,
+                scope,
             }),
         });
 
@@ -48,11 +61,24 @@ export class ApiService {
         return response.json();
     }
 
-    public static async getHistory(customerId: string): Promise<ChatSession> {
-        const response = await fetch(`${API_BASE}/chat/history?customerId=${encodeURIComponent(customerId)}`);
+    public static async getHistory(customerId: string, scope?: 'client' | 'operator'): Promise<ChatSession> {
+        const scopeParam = scope ? `&scope=${encodeURIComponent(scope)}` : '';
+        const response = await fetch(
+            `${API_BASE}/chat/history?customerId=${encodeURIComponent(customerId)}${scopeParam}`
+        );
 
         if (!response.ok) {
             throw new Error(`Failed to load history (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async getSessions(): Promise<ChatSessionSummary[]> {
+        const response = await fetch(`${API_BASE}/chat/sessions`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load sessions (${response.status})`);
         }
 
         return response.json();
@@ -235,16 +261,48 @@ export class ApiService {
         customerId: string,
         text: string,
         agentName?: string,
-        agentId?: string
+        agentId?: string,
+        isInternal?: boolean
     ): Promise<{ session: ChatSession; message: unknown }> {
         const response = await fetch(`${API_BASE}/chat/agent-message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerId, text, agentName, agentId }),
+            body: JSON.stringify({ customerId, text, agentName, agentId, isInternal }),
         });
 
         if (!response.ok) {
             throw new Error(`Failed to send agent message (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async executeOperatorAction(
+        customerId: string,
+        action:
+            | 'suspend_internet'
+            | 'activate_internet'
+            | 'check_signal'
+            | 'reboot_onu'
+            | 'view_invoices'
+            | 'unlock_promise'
+            | 'internal_note',
+        noteText?: string,
+        operatorName?: string
+    ): Promise<{
+        session: ChatSession;
+        customer: Customer;
+        message: string;
+        actionResult: Record<string, unknown>;
+    }> {
+        const response = await fetch(`${API_BASE}/chat/operator-action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId, action, noteText, operatorName }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to execute operator action (${response.status})`);
         }
 
         return response.json();

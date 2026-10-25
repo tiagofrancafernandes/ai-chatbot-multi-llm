@@ -24,7 +24,7 @@ Schema:
 Intent Definitions:
 - "greeting": "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "hello".
 - "customer_registration": User (visitor/prospect) wants to register, sign up, create an account, or open customer profile (e.g. "quero me registrar", "criar conta", "fazer cadastro", "novo cliente", "cadastrar").
-- "plan_pricing": Inquiries about available 100% optical fiber internet plans, pricing, values, coverage in Carmo do Cajuru and São José dos Salgados, or asking "qual meu plano atual?".
+- "plan_pricing": Inquiries about available 100% optical fiber internet plans, pricing, values, selecting urban vs rural area for plans ("área urbana", "área rural", "dentro da cidade", "sítio / arredores", "planos rurais", "planos urbanos"), or asking "qual meu plano atual?".
 - "plan_subscription": User (visitor/prospect) wants to hire/subscribe to a plan (e.g. "quero assinar o plano de 600 mega", "contratar fibra urbana de 800", "assinar de 79.99", "plano rural").
 - "contract_signed": User informs they signed the digital contract ("já assinei", "assinei o contrato", "contrato assinado"). NEVER classify as confirmation_no!
 - "simulate_signature": User wants to simulate digital signature ("simular assinatura", "simular contrato"). NEVER classify "simular assinatura" as confirmation_no or cancellation!
@@ -272,8 +272,41 @@ export function evaluateFallbackIntent(
         text.includes('meus dados') ||
         text.includes('meu plano');
 
+    const isPlanOrAreaSelectionIntent =
+        text.includes('plano') ||
+        text.includes('planos') ||
+        text.includes('assinar') ||
+        text.includes('contratar') ||
+        text.includes('mudar') ||
+        text.includes('trocar') ||
+        text.includes('minha área') ||
+        text.includes('minha area') ||
+        text.includes('dentro da cidade') ||
+        text.includes('sítio / arredores') ||
+        text.includes('sitio / arredores') ||
+        text.includes('área urbana') ||
+        text.includes('area urbana') ||
+        text.includes('área rural') ||
+        text.includes('area rural') ||
+        text.includes('zona rural') ||
+        text.includes('zona urbana') ||
+        text.includes('planos rurais') ||
+        text.includes('planos urbanos');
+
+    const isCoverageQuery =
+        text.includes('cobertura') ||
+        text.includes('área de cobertura') ||
+        text.includes('area de cobertura') ||
+        text.includes('área atendida') ||
+        text.includes('area atendida') ||
+        text.includes('atendem em') ||
+        text.includes('atende em') ||
+        text.includes('atendem na') ||
+        text.includes('atende na');
+
     const isKnowledgeInquiry =
         !isCustomerDataQuery &&
+        !isPlanOrAreaSelectionIntent &&
         (text.includes('onde fica') ||
             text.includes('qual o endereço') ||
             text.includes('qual o endereco') ||
@@ -303,18 +336,7 @@ export function evaluateFallbackIntent(
             text.includes('sabado') ||
             text.includes('cajuru') ||
             text.includes('salgados') ||
-            text.includes('cobertura') ||
-            text.includes('área de cobertura') ||
-            text.includes('area de cobertura') ||
-            text.includes('área atendida') ||
-            text.includes('area atendida') ||
-            text.includes('atendem em') ||
-            text.includes('atende em') ||
-            text.includes('atendem na') ||
-            text.includes('atende na') ||
-            text.includes('zona rural') ||
-            text.includes('área rural') ||
-            text.includes('area rural') ||
+            isCoverageQuery ||
             text.includes('mesh') ||
             text.includes('roteador') ||
             text.includes('link dedicado') ||
@@ -492,9 +514,10 @@ export function evaluateFallbackIntent(
         secondaryRequest = 'none';
     }
 
-    // 9. Plan Pricing & Current Plan Inquiries
+    // 9. Plan Pricing, Current Plan Inquiries & Area Selection
     const isPricing =
         text.includes('plano') ||
+        text.includes('planos') ||
         text.includes('preco') ||
         text.includes('preço') ||
         text.includes('valor') ||
@@ -503,7 +526,21 @@ export function evaluateFallbackIntent(
         text.includes('quais planos') ||
         text.includes('qual meu plano') ||
         text.includes('qual é o meu plano') ||
-        text.includes('meu plano');
+        text.includes('meu plano') ||
+        text.includes('área rural') ||
+        text.includes('area rural') ||
+        text.includes('zona rural') ||
+        text.includes('área urbana') ||
+        text.includes('area urbana') ||
+        text.includes('zona urbana') ||
+        text.includes('dentro da cidade') ||
+        text.includes('nos arredores') ||
+        text.includes('sítio / arredores') ||
+        text.includes('sitio / arredores') ||
+        text.includes('minha área') ||
+        text.includes('minha area') ||
+        text.includes('sítio') ||
+        text.includes('sitio');
 
     if (primaryIntent === 'unknown' && isPricing) {
         primaryIntent = 'plan_pricing';

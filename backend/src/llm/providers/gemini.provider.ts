@@ -66,9 +66,14 @@ export class GeminiProvider implements LlmProvider {
             parts: [{ text: userPrompt }],
         });
 
+        let systemPrompt = INTENT_SYSTEM_PROMPT;
+        if (context?.temporalContext) {
+            systemPrompt += `\n\n[TEMPORAL CONTEXT]\n${context.temporalContext}`;
+        }
+
         const requestPayload = {
             systemInstruction: {
-                parts: [{ text: INTENT_SYSTEM_PROMPT }],
+                parts: [{ text: systemPrompt }],
             },
             contents,
             generationConfig: {
