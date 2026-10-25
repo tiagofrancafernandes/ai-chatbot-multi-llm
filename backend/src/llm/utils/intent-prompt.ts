@@ -11,7 +11,7 @@ Analyze the user text (including Brazilian slang, typos, abbreviations, and info
 
 Schema:
 {
-    "primaryIntent": "greeting" | "customer_registration" | "plan_pricing" | "plan_subscription" | "contract_signed" | "simulate_signature" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
+    "primaryIntent": "greeting" | "customer_registration" | "plan_pricing" | "plan_subscription" | "contract_signed" | "simulate_signature" | "plan_change" | "cancellation" | "address_change" | "technical_support" | "financial" | "knowledge_inquiry" | "confirmation_yes" | "confirmation_no" | "human_handoff" | "unknown",
     "secondaryRequest": "none" | "invoice_request" | "plan_upgrade",
     "actionDetail": string | null,
     "targetPlan": "cheapest" | "Starter" | "Professional" | "Premium Business" | null,
@@ -33,6 +33,7 @@ Intent Definitions:
 - "address_change": User requests address update (e.g., "mudei de casa", "trocar meu endereço pra Rua X 123", "novo endereço").
 - "technical_support": Connection outages, slow speed, blinking red router lights, system errors, "caiu a net", "modem piscando".
 - "financial": Invoices, boletos, 2nd copy, billing, debts, payment inquiries.
+- "knowledge_inquiry": Questions regarding company physical address, location, business days, operating hours, in-person attendance, company rules, holiday exceptions, or temporary notices (e.g. "qual o endereço da empresa?", "vocês têm atendimento presencial?", "qual o horário de funcionamento?", "abre na quarta-feira?", "onde fica?").
 - "confirmation_yes": Affirmation when a confirmation is pending ("sim", "confirmo", "pode ser", "positivo", "claro", "isso", "pode mudar").
 - "confirmation_no": Denial or aborting pending action ("não", "cancela isso", "esquece", "não quero mais", "deixa quieto").
 - "human_handoff": User specifically requests a human agent ("falar com atendente", "humano", "atendente").
@@ -234,16 +235,60 @@ export function evaluateFallbackIntent(
         actionDetail = 'request_cancellation';
     }
 
-    // 3. Address Change Intent
-    const isAddressChange =
-        text.includes('mudei') ||
-        text.includes('endereço') ||
-        text.includes('endereco') ||
-        text.includes('mudar de casa') ||
-        text.includes('trocar rua') ||
-        text.includes('novo endereço');
+    // 3. Knowledge & Information Inquiry (Company address, business hours, in-person attendance, exceptions)
+    const isKnowledgeInquiry =
+        text.includes('onde fica') ||
+        text.includes('qual o endereço') ||
+        text.includes('qual o endereco') ||
+        text.includes('endereço da empresa') ||
+        text.includes('endereco da empresa') ||
+        text.includes('endereço de vocês') ||
+        text.includes('endereco de voces') ||
+        text.includes('atendimento presencial') ||
+        text.includes('atendem presencial') ||
+        text.includes('atendimento físico') ||
+        text.includes('posso ir aí') ||
+        text.includes('posso ir ai') ||
+        text.includes('horário de atendimento') ||
+        text.includes('horario de atendimento') ||
+        text.includes('horário de funcionamento') ||
+        text.includes('horario de funcionamento') ||
+        text.includes('qual o horário') ||
+        text.includes('qual o horario') ||
+        text.includes('que horas abre') ||
+        text.includes('que horas fecha') ||
+        text.includes('abre hoje') ||
+        text.includes('aberto hoje') ||
+        text.includes('funciona hoje') ||
+        text.includes('quarta-feira') ||
+        text.includes('quarta feira') ||
+        text.includes('feriado') ||
+        (text.includes('presencial') && !text.includes('assinar'));
 
-    if (isAddressChange) {
+    if (primaryIntent === 'unknown' && isKnowledgeInquiry) {
+        primaryIntent = 'knowledge_inquiry';
+        actionDetail = 'knowledge_inquiry';
+    }
+
+    // 4. Address Change Intent
+    const isAddressChange =
+        !isKnowledgeInquiry &&
+        (text.includes('mudei') ||
+            (text.includes('endereço') &&
+                (text.includes('mudar') ||
+                    text.includes('trocar') ||
+                    text.includes('novo') ||
+                    text.includes('alterar'))) ||
+            (text.includes('endereco') &&
+                (text.includes('mudar') ||
+                    text.includes('trocar') ||
+                    text.includes('novo') ||
+                    text.includes('alterar'))) ||
+            text.includes('mudar de casa') ||
+            text.includes('trocar rua') ||
+            text.includes('novo endereço'));
+
+    if (primaryIntent === 'unknown' && isAddressChange) {
         primaryIntent = 'address_change';
         actionDetail = 'request_address_change';
 

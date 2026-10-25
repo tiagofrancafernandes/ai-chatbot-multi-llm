@@ -4,6 +4,7 @@ import { BusinessHours } from './business-hours.interface';
 import { ChatSession } from './chat.interface';
 import { FlowDefinition } from './flow.interface';
 import { Contract } from './contract.interface';
+import { KnowledgeBaseData } from './knowledge.interface';
 
 export interface DatabaseSchema {
     customers: Customer[];
@@ -12,4 +13,5 @@ export interface DatabaseSchema {
     sessions: ChatSession[];
     flow: FlowDefinition;
     contracts: Contract[];
+    knowledgeBase: KnowledgeBaseData;
 }

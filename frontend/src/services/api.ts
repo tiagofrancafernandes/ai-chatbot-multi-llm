@@ -1,4 +1,11 @@
-import { InitChatResponse, SendMessageResponse, ChatSession, Customer, ProviderInfo } from '../types/chat';
+import {
+    InitChatResponse,
+    SendMessageResponse,
+    ChatSession,
+    Customer,
+    ProviderInfo,
+    KnowledgeBaseData,
+} from '../types/chat';
 
 const API_BASE = '/api';
 
@@ -134,6 +141,46 @@ export class ApiService {
 
         if (!response.ok) {
             throw new Error(`Failed to get contract (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async getKnowledge(): Promise<KnowledgeBaseData> {
+        const response = await fetch(`${API_BASE}/knowledge`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load knowledge base (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async updateKnowledge(
+        companyRules: string,
+        additionalInstructions?: string
+    ): Promise<KnowledgeBaseData> {
+        const response = await fetch(`${API_BASE}/knowledge`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ companyRules, additionalInstructions }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update knowledge base (${response.status})`);
+        }
+
+        return response.json();
+    }
+
+    public static async rebuildKnowledgeCache(): Promise<KnowledgeBaseData> {
+        const response = await fetch(`${API_BASE}/knowledge/rebuild-cache`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to rebuild knowledge cache (${response.status})`);
         }
 
         return response.json();

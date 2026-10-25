@@ -1,0 +1,22 @@
+### Configuration Variables
+@baseUrl = http://localhost:3001/api
+@contentType = application/json
+
+### 1. Get Current Knowledge Base & Compiled Cache Summary
+# @name getKnowledgeBase
+GET {{baseUrl}}/knowledge
+
+### 2. Update Company Rules & Additional Instructions (Recompiles Cache Summary)
+# @name updateKnowledgeBase
+PUT {{baseUrl}}/knowledge
+Content-Type: {{contentType}}
+
+{
+    "companyRules": "A Telecom Connect oferece atendimento presencial e suporte especializado.\nEndereço: Av. Paulista, 1000, Bela Vista, São Paulo - SP, CEP 01310-100.\nHorário regular de atendimento presencial e telefônico: Segunda a Sexta-feira, das 08h às 18h.\nSuporte técnico de emergência para empresas: 24/7 via WhatsApp e Portal do Cliente.\nFormas de pagamento aceitas: Boletos bancários, PIX com compensação imediata e cartão de crédito.",
+    "additionalInstructions": "Aviso de Manutenção: Na próxima quarta-feira, a sede presencial estará fechada das 12h às 18h para manutenção preventiva. Atendimento online e via telefone operam normalmente."
+}
+
+### 3. Clear and Force Recompile of Knowledge Cache Summary
+# @name rebuildKnowledgeCache
+POST {{baseUrl}}/knowledge/rebuild-cache
+

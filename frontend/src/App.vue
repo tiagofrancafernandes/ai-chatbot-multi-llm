@@ -53,6 +53,19 @@ import { RouterView, RouterLink } from 'vue-router';
                         <iconify-icon icon="fa7-solid:diagram-project" class="text-base"></iconify-icon>
                         Flow Graph
                     </RouterLink>
+
+                    <RouterLink
+                        to="/knowledge"
+                        class="px-3.5 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5"
+                        :class="
+                            $route.name === 'knowledge'
+                                ? 'bg-cyan-600 text-white shadow'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        "
+                    >
+                        <iconify-icon icon="fa7-solid:book-open" class="text-base"></iconify-icon>
+                        Base de Conhecimento
+                    </RouterLink>
                 </nav>
             </div>
         </header>

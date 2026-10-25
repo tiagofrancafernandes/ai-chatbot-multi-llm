@@ -9,6 +9,7 @@ import { BusinessHours } from '../common/interfaces/business-hours.interface';
 import { ChatSession } from '../common/interfaces/chat.interface';
 import { FlowDefinition } from '../common/interfaces/flow.interface';
 import { Contract } from '../common/interfaces/contract.interface';
+import { KnowledgeBaseData } from '../common/interfaces/knowledge.interface';
 import { INITIAL_DATABASE_DATA } from './default-database';
 
 @Injectable()
@@ -347,6 +348,29 @@ export class JsonDatabaseService implements OnModuleInit {
         fs.writeFileSync(this.databaseFilePath, serialized, 'utf-8');
     }
 
+    public getKnowledgeBase(): KnowledgeBaseData {
+        const currentDatabase = this.getDatabase();
+
+        if (!currentDatabase.knowledgeBase) {
+            currentDatabase.knowledgeBase = { ...INITIAL_DATABASE_DATA.knowledgeBase };
+            this.saveDatabase(currentDatabase);
+        }
+
+        return currentDatabase.knowledgeBase;
+    }
+
+    public saveKnowledgeBase(data: KnowledgeBaseData): KnowledgeBaseData {
+        const currentDatabase = this.getDatabase();
+
+        currentDatabase.knowledgeBase = {
+            ...data,
+        };
+
+        this.saveDatabase(currentDatabase);
+
+        return currentDatabase.knowledgeBase;
+    }
+
     private loadDatabase(): void {
         if (!fs.existsSync(this.databaseFilePath)) {
             this.ensureDatabaseFileExists();
@@ -358,6 +382,11 @@ export class JsonDatabaseService implements OnModuleInit {
 
             if (this.cache && !this.cache.contracts) {
                 this.cache.contracts = [];
+            }
+
+            if (this.cache && !this.cache.knowledgeBase) {
+                this.cache.knowledgeBase = { ...INITIAL_DATABASE_DATA.knowledgeBase };
+                this.saveDatabase(this.cache);
             }
 
             if (this.cache?.flow?.nodes) {

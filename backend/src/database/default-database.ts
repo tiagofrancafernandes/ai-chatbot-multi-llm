@@ -87,6 +87,19 @@ export const INITIAL_DATABASE_DATA: DatabaseSchema = {
     },
     sessions: [],
     contracts: [],
+    knowledgeBase: {
+        companyRules:
+            'A Telecom Connect oferece atendimento presencial e suporte técnico especializado.\n' +
+            'Endereço: Av. Paulista, 1000, Bela Vista, São Paulo - SP, CEP 01310-100.\n' +
+            'Horário regular de atendimento presencial e telefônico: Segunda a Sexta-feira, das 08h às 18h.\n' +
+            'Suporte técnico de emergência para empresas: 24/7 via WhatsApp e Portal do Cliente.\n' +
+            'Formas de pagamento aceitas: Boletos bancários, PIX com compensação imediata e cartão de crédito.',
+        additionalInstructions:
+            'Aviso de Feriado/Exceção: Na próxima quarta-feira, a sede presencial estará fechada das 12h às 18h para manutenção preventiva da rede elétrica. O atendimento online e telefônico continuará operando normalmente.',
+        cachedSummary:
+            'Telecom Connect: Atendimento presencial na Av. Paulista, 1000, SP. Horário regular: seg-sex 08h-18h. Suporte emergencial empresas 24/7. Pagamentos via PIX, boleto e cartão. Aviso especial: Quarta-feira sede presencial fechada das 12h às 18h para manutenção elétrica, mas canais online e telefônicos operam normalmente.',
+        lastCompiledAt: Date.now(),
+    },
     flow: {
         id: 'default_flow_v1',
         name: 'Standard Customer Service & Intent Router Flow',

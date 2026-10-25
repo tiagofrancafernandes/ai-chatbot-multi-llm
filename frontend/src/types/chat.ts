@@ -78,3 +78,10 @@ export interface SendMessageResponse {
         modelUsed: string;
     };
 }
+
+export interface KnowledgeBaseData {
+    companyRules: string;
+    additionalInstructions: string;
+    cachedSummary: string;
+    lastCompiledAt: number;
+}

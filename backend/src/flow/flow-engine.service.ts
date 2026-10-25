@@ -48,6 +48,7 @@ export class FlowEngineService {
         }
 
         const flow = this.databaseService.getFlow();
+        const knowledgeBase = this.databaseService.getKnowledgeBase();
 
         // Build Intent Context from conversation history
         const previousBotMessages = session.messages.filter((m) => m.sender === 'bot');
@@ -59,6 +60,7 @@ export class FlowEngineService {
             hasPendingAction: Boolean(session.pendingAction),
             pendingActionType: session.pendingAction?.type,
             customerPlan: customer.plan,
+            knowledgeContext: knowledgeBase.cachedSummary,
         };
 
         // Step 1: Execute AI Intent Decision Node with Context
@@ -83,7 +85,21 @@ export class FlowEngineService {
             }
         }
 
-        // Step 3: Identification & Authentication Guard for Guest Customers
+        // Step 3: Handle Knowledge Inquiries (Rules, physical address, business hours, exceptions)
+        if (analysis.primaryIntent === 'knowledge_inquiry' || this.isKnowledgeQuery(text)) {
+            const knowledgeOutcome = await this.handleKnowledgeInquiry(text, analysis, customer, session);
+
+            return this.finalizeStep(
+                knowledgeOutcome.response,
+                analysis,
+                customer,
+                session,
+                knowledgeOutcome.nodeId,
+                knowledgeOutcome.options
+            );
+        }
+
+        // Step 4: Identification & Authentication Guard for Guest Customers
         if (!customer.isIdentified) {
             const authResult = this.tryAuthenticateCustomer(text, analysis, customer, session, flow);
 
@@ -140,6 +156,80 @@ export class FlowEngineService {
         }
 
         return this.handlePendingConfirmation(text, analysis, session, customer);
+    }
+
+    private isKnowledgeQuery(text: string): boolean {
+        const lower = (text || '').toLowerCase().trim();
+
+        return (
+            lower.includes('onde fica') ||
+            lower.includes('qual o endereço') ||
+            lower.includes('qual o endereco') ||
+            lower.includes('endereço da empresa') ||
+            lower.includes('endereco da empresa') ||
+            lower.includes('endereço de vocês') ||
+            lower.includes('endereco de voces') ||
+            lower.includes('atendimento presencial') ||
+            lower.includes('atendem presencial') ||
+            lower.includes('atendimento físico') ||
+            lower.includes('posso ir aí') ||
+            lower.includes('posso ir ai') ||
+            lower.includes('horário de atendimento') ||
+            lower.includes('horario de atendimento') ||
+            lower.includes('horário de funcionamento') ||
+            lower.includes('horario de funcionamento') ||
+            lower.includes('qual o horário') ||
+            lower.includes('qual o horario') ||
+            lower.includes('que horas abre') ||
+            lower.includes('que horas fecha') ||
+            lower.includes('abre hoje') ||
+            lower.includes('aberto hoje') ||
+            lower.includes('funciona hoje') ||
+            lower.includes('quarta-feira') ||
+            lower.includes('quarta feira') ||
+            lower.includes('feriado') ||
+            (lower.includes('presencial') && !lower.includes('assinar'))
+        );
+    }
+
+    private async handleKnowledgeInquiry(
+        text: string,
+        analysis: IntentAnalysisResult,
+        customer: Customer,
+        session: ChatSession
+    ): Promise<StepRoutingOutcome> {
+        const knowledgeBase = this.databaseService.getKnowledgeBase();
+        const summary = knowledgeBase.cachedSummary || knowledgeBase.companyRules;
+
+        let responseText = '';
+
+        try {
+            const prompt = `Com base nas informações da empresa abaixo, responda à dúvida do cliente de forma prestativa, clara e objetiva:\n\nResumo compilado:\n${summary}\n\nDetalhes de referência:\n${knowledgeBase.companyRules}\n${knowledgeBase.additionalInstructions ? `Avisos adicionais: ${knowledgeBase.additionalInstructions}` : ''}\n\nPergunta do cliente: "${text}"`;
+            const systemInstruction =
+                'Você é o assistente virtual da Telecom Connect. Responda diretamente e cordialmente à dúvida do usuário em português brasileiro usando apenas as informações fornecidas no resumo e regras (endereço, horários, atendimento presencial, exceções). Seja claro, conciso e educado.';
+
+            const generated = await this.llmService.generateText(prompt, systemInstruction, undefined, 'qwen2.5:0.5b');
+
+            if (generated && generated.trim().length > 15 && !generated.startsWith('Service notice:')) {
+                responseText = generated.trim();
+            }
+        } catch (error) {
+            this.logger.warn(`Failed to generate knowledge inquiry response via LLM: ${(error as Error).message}`);
+        }
+
+        if (!responseText) {
+            responseText = `Aqui estão as informações sobre nosso atendimento, horários e endereço:\n\n${summary}\n\nComo posso te ajudar mais?`;
+        }
+
+        const options = customer.isIdentified
+            ? ['Qual é o meu plano atual?', 'Ver minhas faturas', 'Falar com atendente']
+            : ['Quero me cadastrar', 'Ver planos disponíveis', 'Falar com atendente'];
+
+        return {
+            response: responseText,
+            nodeId: 'node_knowledge_inquiry',
+            options,
+        };
     }
 
     private handleNewSubscriptionData(

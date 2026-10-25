@@ -10,6 +10,7 @@ export type PrimaryIntent =
     | 'address_change'
     | 'technical_support'
     | 'financial'
+    | 'knowledge_inquiry'
     | 'confirmation_yes'
     | 'confirmation_no'
     | 'human_handoff'
@@ -22,6 +23,7 @@ export interface IntentContext {
     hasPendingAction?: boolean;
     pendingActionType?: string;
     customerPlan?: string;
+    knowledgeContext?: string;
 }
 
 export interface IntentAnalysisResult {

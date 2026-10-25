@@ -118,7 +118,14 @@ export class OllamaProvider implements LlmProvider {
             lower.includes('quero o plano') ||
             lower.includes('plano starter') ||
             lower.includes('plano pro') ||
-            lower.includes('plano premium')
+            lower.includes('plano premium') ||
+            lower.includes('horário') ||
+            lower.includes('horario') ||
+            lower.includes('presencial') ||
+            lower.includes('onde fica') ||
+            lower.includes('funciona hoje') ||
+            lower.includes('quarta-feira') ||
+            lower.includes('quarta feira')
         );
     }
 
@@ -136,6 +143,8 @@ export class OllamaProvider implements LlmProvider {
                             'User wants to register, sign up, create an account, or open customer profile',
                         plan_subscription: 'User wants to hire, subscribe to, or choose a specific plan',
                         plan_pricing: 'Inquiries about plan prices, tiers, costs or features',
+                        knowledge_inquiry:
+                            'Questions about company address, location, business hours, in-person attendance, holidays or rules',
                         technical_support: 'Technical problems, system outages, errors or downtime',
                         financial: 'Invoices, bills, bank slips, pending statements or payment requests',
                         unknown: 'Unrelated queries or general text',
@@ -333,7 +342,11 @@ export class OllamaProvider implements LlmProvider {
             return '';
         }
 
-        const model = modelOverride || this.configService.get<string>('OLLAMA_CHAT_MODEL') || 'llama3.2:1b';
+        let model = modelOverride || this.configService.get<string>('OLLAMA_CHAT_MODEL') || 'qwen2.5:0.5b';
+
+        if (model.includes('tev1')) {
+            model = this.configService.get<string>('OLLAMA_FALLBACK_MODEL') || 'qwen2.5:0.5b';
+        }
 
         try {
             const chatUrl = `${this.host}/api/chat`;
@@ -353,24 +366,24 @@ export class OllamaProvider implements LlmProvider {
                     messages,
                     stream: false,
                 }),
-                signal: AbortSignal.timeout(10000),
+                signal: AbortSignal.timeout(30000),
             });
 
             if (!response.ok) {
-                return `Service notice: Ollama model ${model} temporarily unavailable (Status: ${response.status}).`;
+                return '';
             }
 
             const data = (await response.json()) as { message?: { content?: string } };
             const content = data.message?.content?.trim();
 
             if (!content) {
-                return 'No text generated from Ollama.';
+                return '';
             }
 
             return content;
         } catch (error) {
             this.logger.warn(`Ollama generateText failed: ${(error as Error).message}`);
-            return 'Thank you for reaching out. We have received your message.';
+            return '';
         }
     }
 
