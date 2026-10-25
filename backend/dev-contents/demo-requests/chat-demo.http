@@ -96,3 +96,74 @@ Content-Type: {{contentType}}
 {
     "customerId": "5511999999999"
 }
+
+### 12. Send Message - Plan Consultation
+# @name sendPlanConsultation
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Qual é o meu plano atual?"
+}
+
+### 13. Send Message - Plan Change Request (Target: Mais barato)
+# @name sendPlanChangeRequest
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Quero mudar para o plano mais barato"
+}
+
+### 14. Send Message - Confirm Plan Change
+# @name sendConfirmPlanChange
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Sim, confirmo a mudança"
+}
+
+### 15. Send Message - Address Change Request
+# @name sendAddressChangeRequest
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Mudei de casa para Rua das Acácias, 450"
+}
+
+### 16. Send Message - Confirm Address Change
+# @name sendConfirmAddressChange
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "Sim, confirmar endereço"
+}
+
+### 17. Send Message - Informal / Slang Technical Support
+# @name sendInformalSupport
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "e ae meu bom, o modem ta piscano vermelho e nao entra net"
+}
+
+### 18. Send Message - Out of Flow Request (Triggers smart alternative options)
+# @name sendOutOfFlowFallback
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "5511999999999",
+    "text": "vocês vendem pão de queijo quentinho?"
+}
+

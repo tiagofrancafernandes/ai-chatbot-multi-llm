@@ -88,3 +88,64 @@ Authorization: Bearer {{$dotenv AUTH_TOKEN}}
     "customerId": "{{CUSTOMER_REF}}"
 }
 
+### 9. Plan Consultation
+# @name planConsultationDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Qual é o meu plano atual?"
+}
+
+### 10. Plan Change Request (Target: Mais barato)
+# @name planChangeRequestDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Quero mudar para o plano mais barato"
+}
+
+### 11. Confirm Plan Change
+# @name confirmPlanChangeDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Sim, confirmo a mudança"
+}
+
+### 12. Address Change Request & Confirmation
+# @name addressChangeDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Mudei de casa para Rua das Acácias, 450"
+}
+
+### 13. Out of Flow Request (Fallback with Options)
+# @name outOfFlowFallbackDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "vocês vendem pão de queijo quentinho?"
+}
+
+

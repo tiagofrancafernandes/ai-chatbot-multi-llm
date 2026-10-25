@@ -144,3 +144,88 @@ Authorization: Bearer {{AUTH_TOKEN}}
     "customerId": "{{CUSTOMER_REF}}"
 }
 
+### 14. Send Message - Plan Consultation
+# @name sendPlanConsultation
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Qual é o meu plano atual?"
+}
+
+### 15. Send Message - Plan Change Request (Target: Mais barato -> Starter)
+# @name sendPlanChangeRequest
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Quero mudar para o plano mais barato"
+}
+
+### 16. Send Message - Affirmative Confirmation for Plan Change
+# @name sendConfirmPlanChange
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Sim, confirmo a mudança"
+}
+
+### 17. Send Message - Address Change Request
+# @name sendAddressChangeRequest
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Mudei de casa para Rua das Acácias, 450"
+}
+
+### 18. Send Message - Confirm Address Change
+# @name sendConfirmAddressChange
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "Sim, confirmar endereço"
+}
+
+### 19. Send Message - Informal / Slang Technical Support (Handled with high confidence)
+# @name sendInformalSupport
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "e ae meu bom, o modem ta piscano vermelho e nao entra net"
+}
+
+### 20. Send Message - Out of Flow Request (Fallback with smart alternative options)
+# @name sendOutOfFlowFallback
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+{
+    "customerId": "{{CUSTOMER_REF}}",
+    "text": "vocês vendem pão de queijo quentinho?"
+}
+
+
