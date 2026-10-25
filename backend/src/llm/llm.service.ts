@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-    LlmProvider,
-    IntentAnalysisResult,
-    ProviderInfo,
-} from './interfaces/llm-provider.interface';
+import { LlmProvider, IntentAnalysisResult, ProviderInfo } from './interfaces/llm-provider.interface';
 import { OllamaProvider } from './providers/ollama.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { OpenAiProvider } from './providers/openai.provider';
@@ -37,14 +33,15 @@ export class LlmService {
         this.activeProviderId = this.providers.has(configuredDefault) ? configuredDefault : 'ollama';
 
         const configuredModel =
-            this.configService.get<string>('DEFAULT_MODEL') ||
-            this.configService.get<string>('ACTIVE_MODEL');
+            this.configService.get<string>('DEFAULT_MODEL') || this.configService.get<string>('ACTIVE_MODEL');
 
         if (configuredModel) {
             this.activeModelOverride = configuredModel;
         }
 
-        this.logger.log(`Default active LLM provider set to: ${this.activeProviderId} (Model: ${this.activeModelOverride || 'default'})`);
+        this.logger.log(
+            `Default active LLM provider set to: ${this.activeProviderId} (Model: ${this.activeModelOverride || 'default'})`
+        );
     }
 
     public registerProvider(provider: LlmProvider): void {

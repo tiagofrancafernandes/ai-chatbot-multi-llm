@@ -50,6 +50,7 @@ yarn.lock
 
 # Local JSON database storage
 backend/data/
+data/
 *.db.json
 db.json
 

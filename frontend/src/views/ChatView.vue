@@ -26,7 +26,10 @@ const quickSuggestions = [
     { label: 'Check Plans & Pricing', text: 'Quais são os planos e valores disponíveis?' },
     { label: 'Auth with Mock Phone', text: 'Meu telefone cadastrado é 5511999999999' },
     { label: 'Auth with Mock CPF', text: 'Meu CPF é 123.456.789-00' },
-    { label: 'Broken System + Invoice Request', text: 'O sistema caiu de novo. Aproveitando, vocês podem me mandar a segunda via da fatura deste mês?' },
+    {
+        label: 'Broken System + Invoice Request',
+        text: 'O sistema caiu de novo. Aproveitando, vocês podem me mandar a segunda via da fatura deste mês?',
+    },
     { label: 'Financial Statements', text: 'Quero ver minhas faturas e extrato financeiro' },
 ];
 
@@ -171,7 +174,9 @@ async function scrollToBottom(): Promise<void> {
 <template>
     <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-6rem)]">
         <!-- Left Panel: Chat Area (8 Cols) -->
-        <section class="lg:col-span-8 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        <section
+            class="lg:col-span-8 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden"
+        >
             <!-- Chat Header -->
             <div class="px-6 py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -179,8 +184,10 @@ async function scrollToBottom(): Promise<void> {
                     <div>
                         <h2 class="text-sm font-semibold text-white">Live AI Support Stream</h2>
                         <p class="text-xs text-slate-400">
-                            Node: <span class="text-cyan-400 font-mono">{{ activeNodeId }}</span> · 
-                            Intent: <span class="text-amber-400 font-mono">{{ currentIntent }}</span>
+                            Node:
+                            <span class="text-cyan-400 font-mono">{{ activeNodeId }}</span>
+                            · Intent:
+                            <span class="text-amber-400 font-mono">{{ currentIntent }}</span>
                         </p>
                     </div>
                 </div>
@@ -194,10 +201,23 @@ async function scrollToBottom(): Promise<void> {
                             :key="prov.id"
                             @click="handleSwitchProvider(prov.id)"
                             class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer flex items-center gap-1"
-                            :class="activeProvider === prov.id ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'"
+                            :class="
+                                activeProvider === prov.id
+                                    ? 'bg-cyan-600 text-white shadow'
+                                    : 'text-slate-400 hover:text-white'
+                            "
                             :title="`${prov.displayName} (${prov.defaultModel})`"
                         >
-                            <iconify-icon :icon="prov.id === 'ollama' ? 'fa7-solid:server' : prov.id === 'gemini' ? 'fa7-solid:wand-magic-sparkles' : 'fa7-solid:microchip'" class="text-xs"></iconify-icon>
+                            <iconify-icon
+                                :icon="
+                                    prov.id === 'ollama'
+                                        ? 'fa7-solid:server'
+                                        : prov.id === 'gemini'
+                                          ? 'fa7-solid:wand-magic-sparkles'
+                                          : 'fa7-solid:microchip'
+                                "
+                                class="text-xs"
+                            ></iconify-icon>
                             {{ prov.id }}
                         </button>
                     </div>
@@ -213,21 +233,32 @@ async function scrollToBottom(): Promise<void> {
                     :class="msg.sender === 'user' ? 'items-end' : 'items-start'"
                 >
                     <div class="flex items-center gap-2 mb-1 text-[11px] text-slate-400 px-1">
-                        <iconify-icon :icon="msg.sender === 'user' ? 'fa7-solid:user' : 'fa7-solid:robot'" class="text-xs"></iconify-icon>
+                        <iconify-icon
+                            :icon="msg.sender === 'user' ? 'fa7-solid:user' : 'fa7-solid:robot'"
+                            class="text-xs"
+                        ></iconify-icon>
                         <span>{{ msg.sender === 'user' ? 'You' : 'SystemOne Bot' }}</span>
-                        <span v-if="msg.detectedIntent" class="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded text-[10px] font-mono">
+                        <span
+                            v-if="msg.detectedIntent"
+                            class="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded text-[10px] font-mono"
+                        >
                             {{ msg.detectedIntent }}
                         </span>
-                        <span v-if="msg.secondaryRequest && msg.secondaryRequest !== 'none'" class="bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded text-[10px] font-mono">
+                        <span
+                            v-if="msg.secondaryRequest && msg.secondaryRequest !== 'none'"
+                            class="bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded text-[10px] font-mono"
+                        >
                             ⚡ {{ msg.secondaryRequest }}
                         </span>
                     </div>
 
                     <div
                         class="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm whitespace-pre-wrap"
-                        :class="msg.sender === 'user' 
-                            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-sm' 
-                            : 'bg-slate-800 text-slate-100 border border-slate-700/60 rounded-tl-sm'"
+                        :class="
+                            msg.sender === 'user'
+                                ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-sm'
+                                : 'bg-slate-800 text-slate-100 border border-slate-700/60 rounded-tl-sm'
+                        "
                     >
                         {{ msg.text }}
                     </div>
@@ -291,11 +322,16 @@ async function scrollToBottom(): Promise<void> {
 
                     <span
                         class="text-xs font-semibold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5"
-                        :class="customer?.isIdentified 
-                            ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' 
-                            : 'bg-amber-950/80 text-amber-400 border-amber-800'"
+                        :class="
+                            customer?.isIdentified
+                                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
+                                : 'bg-amber-950/80 text-amber-400 border-amber-800'
+                        "
                     >
-                        <span class="w-1.5 h-1.5 rounded-full" :class="customer?.isIdentified ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                        <span
+                            class="w-1.5 h-1.5 rounded-full"
+                            :class="customer?.isIdentified ? 'bg-emerald-400' : 'bg-amber-400'"
+                        ></span>
                         {{ customer?.isIdentified ? 'Identified' : 'Guest State' }}
                     </span>
                 </div>
@@ -304,7 +340,9 @@ async function scrollToBottom(): Promise<void> {
                 <div class="space-y-3 text-xs">
                     <div>
                         <span class="text-slate-400 block mb-0.5">Tracking Token (Local Identifier):</span>
-                        <code class="bg-slate-950 text-cyan-300 px-2 py-1 rounded block overflow-x-auto font-mono text-[11px] border border-slate-800">
+                        <code
+                            class="bg-slate-950 text-cyan-300 px-2 py-1 rounded block overflow-x-auto font-mono text-[11px] border border-slate-800"
+                        >
                             {{ currentCustomerId || 'Initializing...' }}
                         </code>
                     </div>
@@ -312,7 +350,9 @@ async function scrollToBottom(): Promise<void> {
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
                             <span class="text-slate-400 block">Name:</span>
-                            <span class="font-medium text-slate-100 text-sm">{{ customer?.name || 'Unidentified Guest' }}</span>
+                            <span class="font-medium text-slate-100 text-sm">
+                                {{ customer?.name || 'Unidentified Guest' }}
+                            </span>
                         </div>
                         <div>
                             <span class="text-slate-400 block">Phone / Mobile:</span>
@@ -324,7 +364,9 @@ async function scrollToBottom(): Promise<void> {
                         </div>
                         <div>
                             <span class="text-slate-400 block">Active Plan:</span>
-                            <span class="inline-block mt-0.5 bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-medium">
+                            <span
+                                class="inline-block mt-0.5 bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-medium"
+                            >
                                 {{ customer?.plan || 'None' }}
                             </span>
                         </div>

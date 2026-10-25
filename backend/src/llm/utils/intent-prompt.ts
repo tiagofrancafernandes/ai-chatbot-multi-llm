@@ -36,7 +36,8 @@ export function evaluateFallbackIntent(rawText: string, providerName = 'heuristi
     let secondaryRequest: SecondaryRequest = 'none';
 
     // Heuristics for secondary request
-    const asksForInvoice = text.includes('fatura') || text.includes('boleto') || text.includes('segunda via') || text.includes('invoice');
+    const asksForInvoice =
+        text.includes('fatura') || text.includes('boleto') || text.includes('segunda via') || text.includes('invoice');
 
     if (asksForInvoice) {
         secondaryRequest = 'invoice_request';

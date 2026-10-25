@@ -1,5 +1,5 @@
 ### Configuration Variables
-@baseUrl = http://localhost:3000/api
+@baseUrl = http://localhost:3001/api
 @contentType = application/json
 
 ### 1. List All Customers

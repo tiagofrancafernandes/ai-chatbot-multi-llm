@@ -173,7 +173,9 @@ export class FlowEngineService {
         if (analysis.primaryIntent === 'plan_pricing') {
             const plans = this.databaseService.getPlans();
             const planList = plans.map((p) => `• ${p.name}: R$ ${p.price.toFixed(2)}/mo`).join('\n');
-            const currentPlanNotice = customer.plan ? `Your active plan is "${customer.plan}".` : 'You do not have an active plan tier yet.';
+            const currentPlanNotice = customer.plan
+                ? `Your active plan is "${customer.plan}".`
+                : 'You do not have an active plan tier yet.';
 
             const response = `${currentPlanNotice}\n\nAvailable Tiers:\n${planList}\n\nWould you like to upgrade or change your current subscription?`;
             return { response, nodeId: 'node_plan_pricing_action' };
@@ -195,7 +197,9 @@ export class FlowEngineService {
             let invoiceSummary = `You have ${customer.invoices.length} total invoice(s) on file (${pendingInvoices.length} pending, ${paidInvoices.length} paid).`;
 
             if (pendingInvoices.length > 0) {
-                const list = pendingInvoices.map((inv) => `• Invoice ${inv.id}: R$ ${inv.amount.toFixed(2)} (Due: ${inv.dueDate})`).join('\n');
+                const list = pendingInvoices
+                    .map((inv) => `• Invoice ${inv.id}: R$ ${inv.amount.toFixed(2)} (Due: ${inv.dueDate})`)
+                    .join('\n');
                 invoiceSummary += `\n\nPending statements:\n${list}\nDirect download link: https://billing.company.local/invoice/${customer.id}`;
             }
 
@@ -208,8 +212,7 @@ export class FlowEngineService {
 
         const fallbackNode = this.findNode(flow, 'node_fallback_message');
         const fallbackText =
-            fallbackNode?.responseTemplate ||
-            'We have received your message. How else may we assist you today?';
+            fallbackNode?.responseTemplate || 'We have received your message. How else may we assist you today?';
 
         return { response: fallbackText, nodeId: 'node_fallback_message' };
     }
@@ -219,7 +222,9 @@ export class FlowEngineService {
             const pending = customer.invoices.filter((inv) => inv.status === 'pending');
 
             if (pending.length > 0) {
-                const list = pending.map((inv) => `[#${inv.id} - R$ ${inv.amount.toFixed(2)} due ${inv.dueDate}]`).join(', ');
+                const list = pending
+                    .map((inv) => `[#${inv.id} - R$ ${inv.amount.toFixed(2)} due ${inv.dueDate}]`)
+                    .join(', ');
                 return `[SystemOne Auto-Trigger]: We also noticed your invoice request! Found ${pending.length} pending statement(s): ${list}. Direct link: https://billing.company.local/quick-pay/${customer.id}`;
             }
 

@@ -7,13 +7,7 @@ import { LmStudioProvider } from './providers/lmstudio.provider';
 
 @Global()
 @Module({
-    providers: [
-        OllamaProvider,
-        GeminiProvider,
-        OpenAiProvider,
-        LmStudioProvider,
-        LlmService,
-    ],
+    providers: [OllamaProvider, GeminiProvider, OpenAiProvider, LmStudioProvider, LlmService],
     exports: [LlmService],
 })
 export class LlmModule {}

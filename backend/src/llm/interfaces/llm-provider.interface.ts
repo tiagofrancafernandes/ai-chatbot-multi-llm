@@ -1,9 +1,4 @@
-export type PrimaryIntent =
-    | 'greeting'
-    | 'plan_pricing'
-    | 'technical_support'
-    | 'financial'
-    | 'unknown';
+export type PrimaryIntent = 'greeting' | 'plan_pricing' | 'technical_support' | 'financial' | 'unknown';
 
 export type SecondaryRequest = 'none' | 'invoice_request' | 'plan_upgrade';
 

@@ -1,10 +1,4 @@
-import {
-    InitChatResponse,
-    SendMessageResponse,
-    ChatSession,
-    Customer,
-    ProviderInfo,
-} from '../types/chat';
+import { InitChatResponse, SendMessageResponse, ChatSession, Customer, ProviderInfo } from '../types/chat';
 
 const API_BASE = '/api';
 

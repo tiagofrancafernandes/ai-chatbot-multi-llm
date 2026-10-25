@@ -28,7 +28,7 @@ Construir uma aplicação completa de Chatbot com Frontend e Backend:
 - [x] Task 3: Provedores Multi-LLM (Ollama SystemOne, Gemini, OpenAI) e Motor de Fluxo Configurável (`tasks/tasks/001-03-backend-llm-providers-and-flow-001.md`)
 - [x] Task 4: API REST do Chat, Customers e Demo Requests (.http) (`tasks/tasks/001-04-backend-chat-api-and-demo-requests-001.md`)
 - [x] Task 5: Frontend Vue 3 + Tailwind v4 + Vue3-Toastify + Iconify (`tasks/tasks/001-05-frontend-vue3-tailwind-toastify-001.md`)
-- [ ] Task 6: Validação integrada, Docker compose e documentação final (`tasks/tasks/001-06-docker-integration-and-verification-001.md`)
+- [x] Task 6: Validação integrada, Docker compose e documentação final (`tasks/tasks/001-06-docker-integration-and-verification-001.md`)
 
 ---
 

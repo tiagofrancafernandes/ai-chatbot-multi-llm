@@ -52,7 +52,9 @@ async function fetchFlow(): Promise<void> {
 <template>
     <div class="space-y-6">
         <!-- Header -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div
+            class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
             <div>
                 <h2 class="text-xl font-bold text-white flex items-center gap-2">
                     <iconify-icon icon="fa7-solid:diagram-project" class="text-cyan-400"></iconify-icon>
@@ -65,7 +67,10 @@ async function fetchFlow(): Promise<void> {
 
             <div class="flex items-center gap-3">
                 <span class="text-xs text-slate-400">
-                    Entry Node: <code class="text-cyan-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{{ flow?.entryNodeId || '...' }}</code>
+                    Entry Node:
+                    <code class="text-cyan-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        {{ flow?.entryNodeId || '...' }}
+                    </code>
                 </span>
                 <button
                     @click="fetchFlow"
@@ -103,7 +108,7 @@ async function fetchFlow(): Promise<void> {
                                 'bg-purple-950 text-purple-300 border-purple-800': node.type === 'decision',
                                 'bg-blue-950 text-blue-300 border-blue-800': node.type === 'action',
                                 'bg-emerald-950 text-emerald-300 border-emerald-800': node.type === 'message',
-                                'bg-amber-950 text-amber-300 border-amber-800': node.type === 'router'
+                                'bg-amber-950 text-amber-300 border-amber-800': node.type === 'router',
                             }"
                         >
                             {{ node.type }}
@@ -119,14 +124,21 @@ async function fetchFlow(): Promise<void> {
                     </div>
 
                     <!-- Response Template -->
-                    <div v-if="node.responseTemplate" class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
+                    <div
+                        v-if="node.responseTemplate"
+                        class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs"
+                    >
                         <span class="text-slate-400 block text-[10px] uppercase font-semibold">Response Template:</span>
-                        <p class="text-slate-300 text-[11px] font-mono whitespace-pre-wrap mt-1">"{{ node.responseTemplate }}"</p>
+                        <p class="text-slate-300 text-[11px] font-mono whitespace-pre-wrap mt-1">
+                            "{{ node.responseTemplate }}"
+                        </p>
                     </div>
 
                     <!-- Transitions / Outgoing Edges -->
                     <div v-if="node.transitions && node.transitions.length > 0" class="pt-2">
-                        <span class="text-slate-400 block text-[10px] uppercase font-semibold mb-1.5 flex items-center gap-1">
+                        <span
+                            class="text-slate-400 block text-[10px] uppercase font-semibold mb-1.5 flex items-center gap-1"
+                        >
                             <iconify-icon icon="fa7-solid:arrow-right" class="text-cyan-400"></iconify-icon>
                             Transitions ({{ node.transitions.length }}):
                         </span>
@@ -139,7 +151,11 @@ async function fetchFlow(): Promise<void> {
                             >
                                 <div class="flex items-center justify-between text-slate-300">
                                     <span class="text-cyan-300">➜ {{ trans.targetNodeId }}</span>
-                                    <span class="text-amber-400 text-[10px]">[{{ trans.condition.type }}<span v-if="trans.condition.value">: {{ trans.condition.value }}</span>]</span>
+                                    <span class="text-amber-400 text-[10px]">
+                                        [{{ trans.condition.type }}
+                                        <span v-if="trans.condition.value">: {{ trans.condition.value }}</span>
+                                        ]
+                                    </span>
                                 </div>
                                 <span v-if="trans.description" class="text-slate-500 font-sans text-[10px]">
                                     {{ trans.description }}
@@ -149,8 +165,13 @@ async function fetchFlow(): Promise<void> {
                     </div>
                 </div>
 
-                <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
-                    <span v-if="node.id === flow.entryNodeId" class="text-emerald-400 font-semibold flex items-center gap-1">
+                <div
+                    class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500"
+                >
+                    <span
+                        v-if="node.id === flow.entryNodeId"
+                        class="text-emerald-400 font-semibold flex items-center gap-1"
+                    >
                         <iconify-icon icon="fa7-solid:play" class="text-xs"></iconify-icon>
                         Entry Point
                     </span>

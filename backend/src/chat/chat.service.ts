@@ -178,7 +178,10 @@ export class ChatService {
         };
     }
 
-    public setProvider(providerId: string, model?: string): { success: boolean; activeProvider: string; activeModel: string } {
+    public setProvider(
+        providerId: string,
+        model?: string
+    ): { success: boolean; activeProvider: string; activeModel: string } {
         if (!providerId) {
             throw new BadRequestException('providerId is required');
         }

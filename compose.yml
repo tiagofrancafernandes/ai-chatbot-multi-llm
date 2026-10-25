@@ -1,14 +1,14 @@
 services:
     backend:
         build:
-            context: ./backend
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: backend/Dockerfile
         container_name: chatbot_backend
         restart: unless-stopped
         ports:
-            - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+            - '${BACKEND_PORT:-3001}:${BACKEND_PORT:-3001}'
         environment:
-            - PORT=${BACKEND_PORT:-3000}
+            - PORT=${BACKEND_PORT:-3001}
             - DEFAULT_PROVIDER=${DEFAULT_PROVIDER:-ollama}
             - DEFAULT_MODEL=${DEFAULT_MODEL:-tev1:0.8b}
             - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
@@ -23,17 +23,17 @@ services:
         volumes:
             - ./backend/data:/app/data
         extra_hosts:
-            - "host.docker.internal:host-gateway"
+            - 'host.docker.internal:host-gateway'
 
     frontend:
         build:
-            context: ./frontend
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: frontend/Dockerfile
             args:
                 - VITE_API_URL=${VITE_API_URL:-http://localhost:3000/api}
         container_name: chatbot_frontend
         restart: unless-stopped
         ports:
-            - "${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}"
+            - '${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}'
         depends_on:
             - backend

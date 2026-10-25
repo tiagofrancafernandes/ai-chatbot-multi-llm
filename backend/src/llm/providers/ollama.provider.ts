@@ -87,19 +87,33 @@ export class OllamaProvider implements LlmProvider {
 
             const data = (await response.json()) as {
                 answers?: {
-                    primaryIntent?: { value?: string };
-                    secondaryRequest?: { value?: string };
-                    isClientExplicit?: { value?: string };
+                    primaryIntent?: { choice?: string; value?: string };
+                    secondaryRequest?: { choice?: string; value?: string };
+                    isClientExplicit?: { noul?: number | string | boolean; value?: string };
                 };
             };
 
-            const rawPrimary = data.answers?.primaryIntent?.value;
-            const rawSecondary = data.answers?.secondaryRequest?.value;
-            const rawClientExplicit = data.answers?.isClientExplicit?.value;
+            const rawPrimary = data.answers?.primaryIntent?.choice || data.answers?.primaryIntent?.value;
+            const rawSecondary = data.answers?.secondaryRequest?.choice || data.answers?.secondaryRequest?.value;
+            const rawClientNoul = data.answers?.isClientExplicit?.noul ?? data.answers?.isClientExplicit?.value;
 
             const primaryIntent = this.normalizePrimaryIntent(rawPrimary);
             const secondaryRequest = this.normalizeSecondaryRequest(rawSecondary);
-            const isClientExplicit = rawClientExplicit === 'yes' || rawClientExplicit === 'true';
+
+            let isClientExplicit = false;
+
+            if (typeof rawClientNoul === 'number') {
+                isClientExplicit = rawClientNoul >= 0.5;
+            }
+
+            if (typeof rawClientNoul === 'string') {
+                const lower = rawClientNoul.toLowerCase();
+                isClientExplicit = lower === 'yes' || lower === 'true';
+            }
+
+            if (typeof rawClientNoul === 'boolean') {
+                isClientExplicit = rawClientNoul;
+            }
 
             const phoneOrIdPattern = /\b(?:\d{10,13}|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/;
             const identifierMatch = text.match(phoneOrIdPattern);
@@ -116,7 +130,9 @@ export class OllamaProvider implements LlmProvider {
                 rawResponse: data,
             };
         } catch (error) {
-            this.logger.warn(`Failed to connect to Ollama at ${this.host}: ${(error as Error).message}. Using heuristic triage.`);
+            this.logger.warn(
+                `Failed to connect to Ollama at ${this.host}: ${(error as Error).message}. Using heuristic triage.`
+            );
             return evaluateFallbackIntent(text, this.providerId);
         }
     }
