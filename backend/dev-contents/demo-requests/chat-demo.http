@@ -167,3 +167,63 @@ Content-Type: {{contentType}}
     "text": "vocês vendem pão de queijo quentinho?"
 }
 
+### 19. Guest Flow - Step 1: Consult Plans to Subscribe
+# @name guestConsultPlans
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_demo_client",
+    "text": "Quero ver os planos para assinar"
+}
+
+### 20. Guest Flow - Step 2: Choose Plan Starter
+# @name guestChoosePlan
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_demo_client",
+    "text": "Quero assinar o plano Starter"
+}
+
+### 21. Guest Flow - Step 3: Send Complete Registration Data
+# @name guestSendRegistration
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_demo_client",
+    "text": "Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120"
+}
+
+### 22. Guest Flow - Step 4: Check Signature when Still Pending (System alerts user)
+# @name guestCheckPendingSignature
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_demo_client",
+    "text": "Já assinei o contrato"
+}
+
+### 23. Digital Signature Platform - REST API to Simulate Signing Contract
+# @name apiSignContract
+POST {{baseUrl}}/chat/contract/sign/CONT-729066
+Content-Type: {{contentType}}
+
+### 24. Digital Signature Platform - REST API to Query Contract Status
+# @name apiGetContract
+GET {{baseUrl}}/chat/contract/CONT-729066
+
+### 25. Guest Flow - Step 5: Inform Signed After Real/Simulated Signature (Activates Account)
+# @name guestConfirmSignature
+POST {{baseUrl}}/chat/message
+Content-Type: {{contentType}}
+
+{
+    "customerId": "guest_demo_client",
+    "text": "Simular assinatura do contrato"
+}
+
+

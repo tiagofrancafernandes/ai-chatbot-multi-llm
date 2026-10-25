@@ -148,4 +148,60 @@ Authorization: Bearer {{$dotenv AUTH_TOKEN}}
     "text": "vocês vendem pão de queijo quentinho?"
 }
 
+### 14. Guest Subscription - Consult Available Plans
+# @name guestConsultPlansDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "guest_dotenv_test",
+    "text": "Quero ver os planos para assinar"
+}
+
+### 15. Guest Subscription - Choose Plan Starter
+# @name guestChoosePlanDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "guest_dotenv_test",
+    "text": "Quero assinar o plano Starter"
+}
+
+### 16. Guest Subscription - Send Complete Registration Data
+# @name guestSendRegistrationDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "guest_dotenv_test",
+    "text": "Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120"
+}
+
+### 17. Guest Subscription - Check Signature Status Before Signing
+# @name guestCheckPendingSignatureDotenv
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "guest_dotenv_test",
+    "text": "Já assinei o contrato"
+}
+
+### 18. Digital Signature Platform - REST Endpoint to Sign Contract
+# @name apiSignContractDotenv
+POST {{BASE_URL}}/api/chat/contract/sign/CONT-729066
+Accept: application/json
+Authorization: Bearer {{$dotenv AUTH_TOKEN}}
+
+### 19. Digital Signature Platform - REST Endpoint to Query Contract
+# @name apiGetContractDotenv
+GET {{BASE_URL}}/api/chat/contract/CONT-729066
+Accept: application/json
+
+
 

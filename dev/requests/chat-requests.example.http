@@ -228,4 +228,71 @@ Authorization: Bearer {{AUTH_TOKEN}}
     "text": "vocês vendem pão de queijo quentinho?"
 }
 
+### 21. Guest Subscription Flow - Step 1: Consult Plans to Subscribe
+# @name guestConsultPlans
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Quero ver os planos para assinar"
+}
+
+### 22. Guest Subscription Flow - Step 2: Choose Plan Starter
+# @name guestChoosePlan
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Quero assinar o plano Starter"
+}
+
+### 23. Guest Subscription Flow - Step 3: Send Complete Registration Data
+# @name guestSendRegistration
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Carlos Silva, CPF 123.456.789-00, carlos@example.com, 5511988887777, Rua das Flores, 120"
+}
+
+### 24. Guest Subscription Flow - Step 4: Check Signature when Still Pending (System alerts user)
+# @name guestCheckPendingSignature
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Já assinei o contrato"
+}
+
+### 25. Digital Signature Platform - REST API to Simulate Signing Contract
+# @name apiSignContract
+POST {{BASE_URL}}/api/chat/contract/sign/CONT-729066
+Accept: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+
+### 26. Digital Signature Platform - REST API to Query Contract Status
+# @name apiGetContract
+GET {{BASE_URL}}/api/chat/contract/CONT-729066
+Accept: application/json
+
+### 27. Guest Subscription Flow - Step 5: Inform Signed After Real/Simulated Signature (Activates Account)
+# @name guestConfirmSignature
+POST {{BASE_URL}}/api/chat/message
+Accept: application/json
+Content-Type: application/json
+
+{
+    "customerId": "{{GUEST_CUSTOMER_ID}}",
+    "text": "Simular assinatura do contrato"
+}
+
+
 
