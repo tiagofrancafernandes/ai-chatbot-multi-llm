@@ -27,6 +27,8 @@ export interface ChatMessage {
     secondaryRequest?: string;
     provider?: string;
     model?: string;
+    options?: string[];
+    metadata?: Record<string, unknown>;
 }
 
 export interface ChatSession {
@@ -36,6 +38,12 @@ export interface ChatSession {
     activeNodeId: string;
     currentIntent?: string;
     secondaryRequest?: string;
+    pendingAction?: {
+        type: string;
+        targetPlan?: string;
+        targetAddress?: string;
+        description: string;
+    } | null;
     createdAt: number;
     updatedAt: number;
 }

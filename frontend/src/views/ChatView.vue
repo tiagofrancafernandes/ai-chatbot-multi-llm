@@ -7,6 +7,7 @@ import { Customer, ChatMessage, ProviderInfo } from '../types/chat';
 const STORAGE_KEY = 'chat_customer_id';
 
 const messages = ref<ChatMessage[]>([]);
+const inputRef = ref<HTMLInputElement>();
 const customer = ref<Customer | null>(null);
 const currentCustomerId = ref<string>('');
 const inputText = ref<string>('');
@@ -23,20 +24,28 @@ const messagesContainer = ref<HTMLDivElement | null>(null);
 
 const quickSuggestions = [
     { label: 'Say Hi', text: 'Olá, bom dia!' },
-    { label: 'Check Plans & Pricing', text: 'Quais são os planos e valores disponíveis?' },
-    { label: 'Auth with Mock Phone', text: 'Meu telefone cadastrado é 5511999999999' },
-    { label: 'Auth with Mock CPF', text: 'Meu CPF é 123.456.789-00' },
-    {
-        label: 'Broken System + Invoice Request',
-        text: 'O sistema caiu de novo. Aproveitando, vocês podem me mandar a segunda via da fatura deste mês?',
-    },
-    { label: 'Financial Statements', text: 'Quero ver minhas faturas e extrato financeiro' },
+    { label: 'Auth Mock Phone', text: 'Meu telefone cadastrado é 5511999999999' },
+    { label: 'Qual meu plano?', text: 'Qual é o meu plano atual?' },
+    { label: 'Mudar p/ mais barato', text: 'Quero mudar para o plano mais barato' },
+    { label: 'Sim, confirmo', text: 'Sim, confirmo a mudança' },
+    { label: 'Mudar endereço', text: 'Mudei de endereço para Rua das Acácias, 450' },
+    { label: 'Quero cancelar', text: 'Quero cancelar meu plano' },
+    { label: 'Ver Faturas', text: 'Quero ver minhas faturas e extrato financeiro' },
 ];
 
 onMounted(async () => {
     await loadProviders();
     await initSession();
 });
+
+function focusMessageInput() {
+    setTimeout(() => {
+        inputRef.value?.focus();
+        if (inputRef.value) {
+            inputRef.value?.focus();
+        }
+    }, 300);
+}
 
 async function loadProviders(): Promise<void> {
     try {
@@ -68,11 +77,13 @@ async function initSession(): Promise<void> {
         activeNodeId.value = result.session.activeNodeId;
         currentIntent.value = result.session.currentIntent || 'greeting';
 
+        focusMessageInput();
         await scrollToBottom();
     } catch (error) {
         toast.error(`Session error: ${(error as Error).message}`);
     } finally {
         isLoading.value = false;
+        focusMessageInput();
     }
 }
 
@@ -130,6 +141,7 @@ async function handleSendMessage(customText?: string): Promise<void> {
         toast.error(`Failed to deliver message: ${(error as Error).message}`);
     } finally {
         isLoading.value = false;
+        focusMessageInput();
     }
 }
 
@@ -168,6 +180,7 @@ async function scrollToBottom(): Promise<void> {
     }
 
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    focusMessageInput();
 }
 </script>
 
@@ -262,6 +275,32 @@ async function scrollToBottom(): Promise<void> {
                     >
                         {{ msg.text }}
                     </div>
+
+                    <!-- Interactive Option Buttons / Confirmation Chips -->
+                    <div
+                        v-if="msg.sender === 'bot' && msg.options && msg.options.length > 0"
+                        class="flex flex-wrap gap-2 mt-2 max-w-[85%]"
+                    >
+                        <button
+                            v-for="(opt, optIndex) in msg.options"
+                            :key="optIndex"
+                            @click="handleSendMessage(opt)"
+                            :disabled="isLoading"
+                            class="text-xs bg-slate-800/90 hover:bg-cyan-950 text-cyan-300 hover:text-cyan-100 border border-slate-700 hover:border-cyan-500 px-3 py-1.5 rounded-xl font-medium transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                        >
+                            <iconify-icon
+                                :icon="
+                                    opt.toLowerCase().includes('sim') || opt.toLowerCase().includes('confirm')
+                                        ? 'fa7-solid:check'
+                                        : opt.toLowerCase().includes('não') || opt.toLowerCase().includes('cancel')
+                                          ? 'fa7-solid:xmark'
+                                          : 'fa7-solid:arrow-right'
+                                "
+                                class="text-[10px]"
+                            ></iconify-icon>
+                            {{ opt }}
+                        </button>
+                    </div>
                 </div>
 
                 <div v-if="isLoading" class="flex items-center gap-2 text-xs text-cyan-400 animate-pulse px-2 py-1">
@@ -293,6 +332,7 @@ async function scrollToBottom(): Promise<void> {
             <form @submit.prevent="handleSendMessage()" class="p-4 bg-slate-900 border-t border-slate-800 flex gap-3">
                 <input
                     v-model="inputText"
+                    ref="inputRef"
                     type="text"
                     placeholder="Type your message, phone number, or ask about plans..."
                     :disabled="isLoading"
@@ -368,6 +408,14 @@ async function scrollToBottom(): Promise<void> {
                                 class="inline-block mt-0.5 bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-medium"
                             >
                                 {{ customer?.plan || 'None' }}
+                            </span>
+                        </div>
+
+                        <div v-if="customer?.metadata?.address" class="col-span-2 pt-1">
+                            <span class="text-slate-400 block">Registered Address:</span>
+                            <span class="font-medium text-slate-200 text-xs flex items-center gap-1.5 mt-0.5">
+                                <iconify-icon icon="fa7-solid:location-dot" class="text-cyan-400"></iconify-icon>
+                                {{ customer.metadata.address }}
                             </span>
                         </div>
                     </div>
